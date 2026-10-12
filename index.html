@@ -34,6 +34,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 h1{font-family:var(--display);font-size:1.5rem;margin:0;letter-spacing:.04em}
 .brand{flex:1 1 220px;min-width:0}
+.story{background:var(--sky-soft);border-radius:14px;padding:16px;display:grid;gap:6px;font-family:var(--display);font-size:1.02rem;line-height:1.8}
+.story p{margin:0}
+.story .go{font-family:var(--body);font-size:.88rem;color:var(--muted);margin-top:4px}
 .tagline{margin:2px 0 0;font-size:.8rem;color:var(--muted);line-height:1.5}
 .mnav{display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .mnav button{font:inherit;font-size:1.2rem;border:0;background:none;color:var(--sky);padding:4px 10px;cursor:pointer}
@@ -118,11 +121,16 @@ summary{cursor:pointer;font-weight:700}
 <body>
 <div class="wrap">
   <header>
-    <div class="brand"><h1 id="appTitle">滿天星行事曆</h1><p class="tagline">用行運的角度回顧每天發生的事，也提前看見接下來的星象，預先準備、為自己做主。</p></div>
+    <div class="brand"><h1 id="appTitle">滿天星行事曆</h1><p class="tagline">記下的每一天，都會成為照亮前路的星。</p></div>
     <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button></div>
   </header>
 
-  <p class="empty" id="welcome" hidden>歡迎使用！填好出生日期、時間和出生地，按「儲存並開始使用」。</p>
+  <div class="story" id="welcome" hidden>
+    <p>抬頭看今天，生活常常一片迷茫。</p>
+    <p>但只要每天記下一點點，回頭看時，你會看見滿天星。</p>
+    <p>看懂星星之間的規律，過去的經驗就會照亮你往後的路。</p>
+    <p class="go">填好下面的出生資料，點亮你的第一顆星。</p>
+  </div>
 
   <nav class="strip needs-birth" id="strip" aria-label="選擇日期"></nav>
 
@@ -890,7 +898,7 @@ function start(){
   document.querySelectorAll(".needs-birth").forEach(el=>el.hidden=!ready);
   $("welcome").hidden=ready;
   fillBirth();
-  $("birthBtn").textContent=ready?"更新出生資料":"儲存並開始使用";
+  $("birthBtn").textContent=ready?"更新出生資料":"點亮第一顆星";
   if(ready){goto(todayKey);renderUpcoming();renderWatch();$("settings").open=false;} else $("settings").open=true;
 }
 start();
