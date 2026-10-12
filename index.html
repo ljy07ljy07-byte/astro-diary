@@ -17,7 +17,7 @@
 :root{
   --bg:#f3f4f8; --paper:#ffffff; --ink:#1d2340; --muted:#646b86; --line:#dde0ea;
   --accent:#b5761c; --accent-soft:#f6ead6; --sky:#2f3d7a; --sky-soft:#e6e9f5;
-  --bad:#b4483c;
+  --bad:#b4483c; --good:#2f7d4f; --good-soft:#e1f1e6; --bad-soft:#f7e3e0;
   --display:"Songti TC","Noto Serif TC","PMingLiU",serif;
   --body:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
   color-scheme:light;
@@ -25,7 +25,7 @@
 @media (prefers-color-scheme: dark){:root{
   --bg:#12152a; --paper:#1b1f38; --ink:#e8e9f2; --muted:#a2a7c2; --line:#2e3355;
   --accent:#e2a64e; --accent-soft:#3a2f1c; --sky:#aab6f0; --sky-soft:#252b4d;
-  --bad:#e58a7e; color-scheme:dark}}
+  --bad:#e58a7e; --good:#7fcf9c; --good-soft:#1f3a2b; --bad-soft:#3d2422; color-scheme:dark}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
@@ -72,7 +72,11 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .note{font-size:.95rem;border-top:1px dashed var(--line);padding-top:8px}
 .recall{background:var(--accent-soft);border-radius:10px;padding:10px 12px;display:grid;gap:6px;font-size:.92rem}
 .recall b{color:var(--accent)}
-.recall .r{display:grid;gap:2px}
+.recall .r{display:grid;gap:2px;border-left:3px solid var(--line);padding-left:8px}
+.recall .r.good{border-color:var(--good)}.recall .r.bad{border-color:var(--bad)}
+.pill{display:inline-block;font-size:.75rem;font-weight:600;padding:1px 7px;border-radius:999px;margin-right:6px;vertical-align:1px}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.list button.good{border-left:4px solid var(--good)}.list button.bad{border-left:4px solid var(--bad)}
 .recall small{color:var(--muted)}
 .recall summary{cursor:pointer;color:var(--accent);font-weight:400;font-size:.85rem}
 .recall details{display:grid;gap:6px}
@@ -746,13 +750,16 @@ function recallsFor(k){
   // 影響越大的排越前面，同分的話越近的越前面
   return out.sort((a,b)=>Number(b.e.intensity)-Number(a.e.intensity)||(a.d<b.d?1:-1));
 }
+// 開心的往事＝好機會（綠），不開心的＝要小心（紅）
+function tone(e){return e.feeling==="開心"?"good":e.feeling==="不開心"?"bad":""}
+function pill(e){const c=tone(e); if(!c) return null; const s=document.createElement("span"); s.className="pill "+c; s.textContent=c==="good"?"好事":"要小心"; return s}
 function renderRecall(){
   const r=recallsFor(sel), box=$("recall"); box.innerHTML="";
   box.hidden=!r.length; if(!r.length) return;
-  const h=document.createElement("b"); h.textContent="回顧：以前出現類似星象時"; box.appendChild(h);
+  const h=document.createElement("b"); h.textContent="回顧：上次遇到類似星象時"; box.appendChild(h);
   const row=x=>{
-    const div=document.createElement("div"); div.className="r";
-    const t=document.createElement("span"); t.textContent=`${md(x.d)}　${x.e.text}`+(x.e.feeling?"　"+x.e.feeling:"");
+    const div=document.createElement("div"); div.className="r "+tone(x.e);
+    const t=document.createElement("span"); t.append(pill(x.e)||"",`${md(x.d)}　${x.e.text}`);
     const w=document.createElement("small"); w.textContent=`當時也是「${x.why}」，影響 ${x.e.intensity}`;
     div.append(t,w); return div;
   };
@@ -774,10 +781,10 @@ function renderWatch(){
     if(last&&last.sig===sig) last.end=k; else hits.push({k,end:k,r,sig});});
   $("watchSec").hidden=!hits.length;
   hits.forEach(({k,end,r})=>{
-    const b=document.createElement("button");
+    const b=document.createElement("button"); b.className=tone(r[0].e);
     const d=document.createElement("span"); d.className="d"; d.textContent=md(k)+(end!==k?"～"+md(end).split("/")[1]:"");
     const body=document.createElement("span"); body.className="t";
-    const a=document.createElement("span"); a.textContent=`類似 ${md(r[0].d)}：${r[0].e.text}`;
+    const a=document.createElement("span"); a.append(pill(r[0].e)||"",`類似 ${md(r[0].d)}：${r[0].e.text}`);
     const tn=document.createElement("span"); tn.className="tn"; tn.textContent=`星象：${r[0].why}`;
     body.append(a,tn); b.append(d,body,document.createElement("span"));
     b.onclick=()=>{goto(k);scrollTo({top:0,behavior:"smooth"});};
