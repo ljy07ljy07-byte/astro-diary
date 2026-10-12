@@ -538,14 +538,24 @@ function majorDay(y,m,d,tz,nat){
   return out;
 }
 
-// 傾向文字
-const KW={Sun:"自己、精力",Moon:"情緒、家裡",Mercury:"溝通、文件、消息",Venus:"人際、金錢",Mars:"行動力、衝突",Jupiter:"機會、運氣",Saturn:"責任、壓力、官方",Uranus:"突發變動",Neptune:"直覺、模糊",Pluto:"深層的事、控制",ASC:"自己的形象",MC:"工作、事業"};
+// 傾向文字：依本命點與相位性質（順／緊／合）
+const PH={
+ Sun:["精神好、做事有成果","有點累、想法和別人不一樣","精神集中在自己身上"],
+ Moon:["情緒穩、和家人相處好","情緒敏感、容易被挑起","情緒比較敏感，需要被理解"],
+ Mercury:["溝通順、適合處理文件","溝通容易誤會，文件要再確認","想法多、話多"],
+ Venus:["人際和氣、有好感","人際上容易有小比較或不愉快","人際、金錢的事比較多"],
+ Mars:["行動力強、做事有效率","容易急躁、和人起衝突","行動力強，也容易急"],
+ Jupiter:["順，容易得到幫助","容易想太多、做太多","順，運氣不錯"],
+ Saturn:["穩定、做事有成果","覺得事情卡、有壓力","覺得被要求、有壓力"],
+ Uranus:["有新點子","有突發狀況","想要改變"],
+ Neptune:["直覺敏銳、有靈感","消息不清楚、容易誤會","容易恍神、想像力強"],
+ Pluto:["專注、能深入處理事情","情緒深、容易想很多或有控制感","情緒深、容易想很多"],
+ ASC:["狀態好、被看見","人際上有點緊張","想法多、被看見"],
+ MC:["工作順、被看見","工作和家庭兩邊拉扯","工作的事被看見"]};
 const HARD=new Set(["四分","對分"]), SOFT=new Set(["六分","三分"]);
+const RANK={"合":0,"對分":1,"四分":2,"三分":3,"六分":4};
 function phrase(aspect,pointKey){
-  const kw=KW[pointKey];
-  if(SOFT.has(aspect)) return kw+"比較順";
-  if(HARD.has(aspect)) return kw+"容易有摩擦";
-  return kw+"的主題很明顯";
+  const p=PH[pointKey]; return SOFT.has(aspect)?p[0]:HARD.has(aspect)?p[1]:p[2];
 }
 function day(y,m,d,tz,nat){
   const moon=moonDay(y,m,d,tz,nat), major=majorDay(y,m,d,tz,nat);
@@ -563,10 +573,10 @@ function day(y,m,d,tz,nat){
   major.filter(x=>x.type==="station").forEach(x=>t.push(x.body==="水星"&&x.text.includes("逆行")?"文件、訊息要再確認":x.text));
   if(major.some(x=>x.type==="lunation"&&x.text.startsWith("新月"))) t.push("適合開始新的事");
   if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) t.push("事情到一個段落，情緒比較滿");
-  moon.hits.slice(0,2).forEach(h=>t.push(phrase(h.aspect,h.point.key)));
+  [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,2).forEach(h=>t.push(phrase(h.aspect,h.point.key)));
   if(bg.length) lines.push({tag:"景",text:bg.join("、")});
   const seen=new Set(), uniq=[];
-  t.forEach(x=>{const k=x.replace(/(比較順|容易有摩擦|的主題很明顯)$/,"");if(!seen.has(k)){seen.add(k);uniq.push(x);}});
+  t.forEach(x=>{if(!seen.has(x)){seen.add(x);uniq.push(x);}});
   return {lines, tendency: uniq.length?uniq.slice(0,3).join("；"):"平穩的一天"};
 }
 root.Astro={natal,day,fmt,signOf,SIGNS};
