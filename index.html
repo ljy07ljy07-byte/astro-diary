@@ -34,10 +34,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 h1{font-family:var(--display);font-size:1.5rem;margin:0;letter-spacing:.04em}
 .brand{flex:1 1 220px;min-width:0}
-.story{background:var(--sky-soft);border-radius:14px;padding:16px;display:grid;gap:6px;font-family:var(--display);font-size:1.02rem;line-height:1.8}
+.story{background:linear-gradient(180deg,var(--sky-soft),var(--bg,transparent));border-radius:18px;padding:28px 18px 22px;display:grid;gap:10px;text-align:center;font-family:var(--display);font-size:1.02rem;line-height:1.9;letter-spacing:.04em}
 .story p{margin:0}
-.story .stars{text-align:right;font-size:1.25rem;letter-spacing:.2em;color:var(--accent);font-weight:600}
-.story .go{font-family:var(--body);font-size:.88rem;color:var(--muted);margin-top:4px}
+.story .stars{font-size:1.6rem;color:var(--accent);font-weight:600;margin:10px 0}
+.story .stars span{letter-spacing:.3em}
+.story .stars::before,.story .stars::after{content:"✦";font-size:.7em;opacity:.7;margin:0 .35em;vertical-align:.15em}
+.story .go{font-family:var(--body);font-size:.88rem;color:var(--muted);margin-top:14px;padding-top:14px;border-top:1px dashed currentColor;border-color:color-mix(in srgb,var(--muted) 35%,transparent);letter-spacing:0}
 .tagline{margin:2px 0 0;font-size:.8rem;color:var(--muted);line-height:1.5}
 .mnav{display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .mnav button{font:inherit;font-size:1.2rem;border:0;background:none;color:var(--sky);padding:4px 10px;cursor:pointer}
@@ -128,8 +130,8 @@ summary{cursor:pointer;font-weight:700}
 
   <div class="story" id="welcome" hidden>
     <p>低頭看今天，生活常常一片迷茫。</p>
-    <p>但只要每天記下一顆星，當你回頭仰望天空時，</p>
-    <p class="stars">滿天星斗，</p>
+    <p>但只要每天記下一顆星，<br>當你回頭仰望天空時，</p>
+    <p class="stars"><span>滿天星</span>斗，</p>
     <p>將用過往的經驗照亮明天的路。</p>
     <p class="go">填好下面的出生資料，點亮你的第一顆星。</p>
   </div>
