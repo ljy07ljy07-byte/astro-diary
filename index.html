@@ -100,7 +100,10 @@ details{background:var(--paper);border:1px solid var(--line);border-radius:14px;
 summary{cursor:pointer;font-weight:700}
 .form{display:grid;gap:10px;margin-top:12px}
 .form label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.form input,.form textarea{width:100%;min-width:0;max-width:100%}
+.form input[type=date],.form input[type=time]{-webkit-appearance:none;appearance:none;min-height:42px;text-align:left}
+.wrap{overflow-x:hidden}
 .natal{font-size:.85rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
 </style>
 </head>
@@ -111,7 +114,7 @@ summary{cursor:pointer;font-weight:700}
     <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button></div>
   </header>
 
-  <p class="empty" id="welcome" hidden>歡迎使用。先在下面輸入你的出生日期、時間和地點，App 就會自動算出每天的星象。</p>
+  <p class="empty" id="welcome" hidden>歡迎使用！在下面填好出生日期和時間，按「儲存並開始使用」就能進入行事曆。如果有 Claude 給你的匯入連結，貼在最下面的框框按「匯入」也可以。</p>
 
   <nav class="strip needs-birth" id="strip" aria-label="選擇日期"></nav>
 
@@ -161,16 +164,16 @@ summary{cursor:pointer;font-weight:700}
     <summary>出生資料與備份</summary>
     <form class="form" id="birthForm">
       <div class="grid2">
-        <label>出生日期<input type="date" id="bDate" required></label>
-        <label>出生時間<input type="time" id="bTime" required></label>
+        <label>出生日期<input type="date" id="bDate"></label>
+        <label>出生時間<input type="time" id="bTime"></label>
       </div>
       <div class="grid2">
-        <label>緯度（北為正）<input type="number" step="0.01" id="bLat" placeholder="高雄約 22.63" required></label>
-        <label>經度（東為正）<input type="number" step="0.01" id="bLon" placeholder="高雄約 120.28" required></label>
+        <label>緯度（高雄 22.63）<input type="number" step="0.01" id="bLat" value="22.63"></label>
+        <label>經度（高雄 120.28）<input type="number" step="0.01" id="bLon" value="120.28"></label>
       </div>
-      <label>時區（台灣是 +8）<input type="number" step="0.5" id="bTz" value="8" required></label>
+      <label>時區（台灣是 +8）<input type="number" step="0.5" id="bTz" value="8"></label>
       <div class="natal" id="natal"></div>
-      <div><button class="btn2" type="submit">更新出生資料</button></div>
+      <div><button class="btn2" type="submit" id="birthBtn">更新出生資料</button></div>
     </form>
     <div class="form">
       <p class="hint">資料只存在這支手機裡。建議每個月按一次「匯出備份」，換手機時用「匯入備份」還原。</p>
@@ -739,17 +742,21 @@ $("planForm").addEventListener("submit",e=>{
 
 // ---- 設定 ----
 function fillBirth(){
-  const b=S.birth; if(!b){$("natal").textContent="";return;}
+  const b=S.birth; if(!b){$("natal").textContent="";if(!$("bDate").value)$("bDate").value="1990-01-01";if(!$("bTime").value)$("bTime").value="12:00";return;}
   $("bDate").value=`${b.y}-${pad(b.m)}-${pad(b.d)}`; $("bTime").value=`${pad(b.hh)}:${pad(b.mm)}`;
   $("bLat").value=b.lat.toFixed(2); $("bLon").value=b.lon.toFixed(2); $("bTz").value=b.tz;
   $("natal").innerHTML=""; NAT.forEach(p=>{const s=document.createElement("span");s.textContent=p.name+" "+Astro.fmt(p.lon);$("natal").appendChild(s);});
 }
 $("birthForm").addEventListener("submit",e=>{
   e.preventDefault();
+  if(!$("bDate").value||!$("bTime").value){$("bmsg").textContent="請先選出生日期和時間。";return;}
+  if(!$("bLat").value) $("bLat").value="22.63";
+  if(!$("bLon").value) $("bLon").value="120.28";
+  if(!$("bTz").value) $("bTz").value="8";
   const [y,m,d]=$("bDate").value.split("-").map(Number), [hh,mm]=$("bTime").value.split(":").map(Number);
   S.birth={y,m,d,hh,mm,lat:Number($("bLat").value),lon:Number($("bLon").value),tz:Number($("bTz").value)};
   persist(); NAT=Astro.natal(S.birth); for(const k in cache) delete cache[k];
-  start(); $("bmsg").textContent="出生資料已更新，星象重新計算了。";
+  start(); $("bmsg").textContent="出生資料已更新，星象重新計算了。"; scrollTo({top:0,behavior:"smooth"});
 });
 $("exportBtn").onclick=async()=>{
   const name=`滿天星行事曆備份-${todayKey}.json`;
@@ -783,7 +790,8 @@ function start(){
   document.querySelectorAll(".needs-birth").forEach(el=>el.hidden=!ready);
   $("welcome").hidden=ready;
   fillBirth();
-  if(ready){goto(todayKey);renderUpcoming();} else $("settings").open=true;
+  $("birthBtn").textContent=ready?"更新出生資料":"儲存並開始使用";
+  if(ready){goto(todayKey);renderUpcoming();$("settings").open=false;} else $("settings").open=true;
 }
 start();
 if("serviceWorker" in navigator && location.protocol==="https:"){navigator.serviceWorker.register("sw.js").catch(()=>{});}
