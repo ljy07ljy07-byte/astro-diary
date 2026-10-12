@@ -178,6 +178,9 @@ summary{cursor:pointer;font-weight:700}
         <button class="btn2" type="button" id="exportBtn">匯出備份</button>
         <label class="btn2" style="display:inline-block">匯入備份<input type="file" id="importFile" accept="application/json,.json" hidden></label>
       </div>
+      <label class="hint" for="codeBox">從 Claude 拿到的匯入連結，貼在這裡：</label>
+      <textarea id="codeBox" style="min-height:60px" placeholder="貼上以 https:// 開頭的匯入連結"></textarea>
+      <div><button class="btn2" type="button" id="codeBtn">匯入</button></div>
       <span class="msg" id="bmsg"></span>
     </div>
   </details>
@@ -578,15 +581,16 @@ try{S=JSON.parse(localStorage.getItem(STORE)||"null")}catch(e){S=null}
 if(!S) S={birth:null,entries:{},plans:{},notes:{}};
 S.notes=S.notes||{};
 // 一次性匯入連結：#data=<base64url JSON>（資料只在網址的 # 後面，不會傳到伺服器）
-if(location.hash.startsWith("#data=")){
-  try{
-    const b64=location.hash.slice(6).replace(/-/g,"+").replace(/_/g,"/");
+function importCode(code){
+    const b64=code.slice(code.indexOf("#data=")+6).trim().replace(/-/g,"+").replace(/_/g,"/");
     const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
     const d=JSON.parse(new TextDecoder().decode(bytes));
     if(d.birth) S.birth=d.birth;
     for(const f of ["entries","plans","notes"]) for(const k in (d[f]||{})) if(!(k in S[f])) S[f][k]=d[f][k];
     persist();
-  }catch(e){}
+}
+if(location.hash.startsWith("#data=")){
+  try{importCode(location.hash);}catch(e){}
   history.replaceState(null,"",location.pathname);
 }
 persist();
@@ -754,6 +758,12 @@ $("exportBtn").onclick=async()=>{
   }catch(e){ if(e&&e.name==="AbortError") return; }
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove();
   $("bmsg").textContent="已匯出。";
+};
+$("codeBtn").onclick=()=>{
+  const v=$("codeBox").value;
+  if(!v.includes("#data=")){$("bmsg").textContent="這不是匯入連結，請整段複製再貼上。";return;}
+  try{importCode(v);NAT=Astro.natal(S.birth);for(const k in cache) delete cache[k];start();$("codeBox").value="";$("bmsg").textContent="已匯入你的資料。";}
+  catch(e){$("bmsg").textContent="連結不完整，請整段複製再貼上。";}
 };
 $("importFile").onchange=async e=>{
   const f=e.target.files[0]; if(!f) return;
