@@ -99,6 +99,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .kind.new{background:var(--accent-soft);color:var(--accent)}
 .auto{margin:0;font-size:.9rem;background:var(--sky-soft);border-radius:10px;padding:8px 12px;line-height:1.6}
 .auto b{color:var(--sky)}
+.auto .fix{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.auto .fix .chip{font-size:.8rem;padding:3px 10px}
 .del{border:0;background:none;cursor:pointer;color:var(--muted);font-size:1.2rem;padding:0 6px}
 .addrow{display:flex;gap:6px;flex-wrap:wrap}
 input[type=text],input[type=number],input[type=date],input[type=time],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
@@ -744,14 +746,16 @@ function chipGroup(el,items,field){
   });
 }
 // ---- 自動對照：把日記的類別、關鍵字、心情，跟那天星象講到的面向比對（不是 AI，是規則比對）----
-const KW={"工作／學業":/工作|上班|主管|老闆|同事|客戶|開會|報告|專案|考試|上課|學校|作業|面試|加班|升遷|業績/,
+const KW={"工作／學業":/工作|上班|主管|老闆|同事|客戶|開會|報告|專案|考試|上課|學校|作業|面試|加班|升遷|業績|完成|做出|做好|做完|創造|創作|建立|設計|進度|效率|app|程式|網站|作品|計畫|企劃|創業|生意|上架|教課|學會|讀書/i,
  "感情":/老公|老婆|男友|女友|另一半|約會|曖昧|告白|分手|喜歡|戀/,"人際":/朋友|同學|聚餐|吵架|誤會|聊天|社團|鄰居|口角/,
  "家人":/媽|爸|小孩|孩子|兒子|女兒|家人|家裡|公婆|爺爺|奶奶|兄弟|姊妹|姐妹/,"金錢":/錢|股票|基金|賺|賠|薪|獎金|花了|買|帳單|房租|中獎|投資/,
  "健康":/生病|感冒|痛|累|睡|醫|牙|藥|看診|運動|受傷|身體|失眠/,"心情":/心情|難過|開心|焦慮|煩|壓力|哭|生氣|低落|放鬆/,"生活瑣事":/搬家|修|壞掉|遺失|忘記|塞車|遲到|手機|網路|快遞/};
 function autoMatch(k,e){
   if(!e||!e.text&&!e.category) return null;
+  if(e.matchMine) return {level:e.matchMine,mine:true};
   const cats=new Set(e.category?[e.category]:[]);
   for(const c in KW) if(KW[c].test(e.text||"")) cats.add(c);
+  if(!cats.size) return {level:"看不出來"};
   const th=dayAstro(k).themes||[];
   const ft=tone(e)||null;
   const hits=th.filter(t=>t.cats.some(c=>cats.has(c)));
@@ -767,9 +771,18 @@ function renderAuto(){
   box.hidden=!r; if(!r) return;
   box.innerHTML="";
   const b=document.createElement("b");
-  if(r.level==="沒提到"){b.textContent="跟星象對照：沒提到";box.append(b,"　這天的星象沒講到這方面的事，也很正常，留著當紀錄就好。");return;}
-  b.textContent=r.level==="對得上"?"跟星象對照：✓✓ 對得上":"跟星象對照：✓ 有提到";
-  box.append(b,`　這天的星象有提到「${r.area}」方面：${r.text}`+(r.level==="對得上"?"，連好壞都對得上。":"。"));
+  if(r.mine){b.textContent="跟星象對照："+(r.level==="對得上"?"✓✓ 對得上":"沒提到");box.append(b,"　（你自己判斷的）");}
+  else if(r.level==="看不出來"){b.textContent="跟星象對照：";box.append(b,"還看不出來是哪方面的事，點一下上面「跟什麼有關」就能比對。");}
+  else if(r.level==="沒提到"){b.textContent="跟星象對照：沒提到";box.append(b,"　這天的星象沒講到這方面的事，也很正常，留著當紀錄就好。");}
+  else{b.textContent=r.level==="對得上"?"跟星象對照：✓✓ 對得上":"跟星象對照：✓ 有提到";
+    box.append(b,`　這天的星象有提到「${r.area}」方面：${r.text}`+(r.level==="對得上"?"，連好壞都對得上。":"。"));}
+  // 自動判斷不準時，自己按一下改掉
+  const fix=document.createElement("span"); fix.className="fix";
+  const mk=(t,v)=>{const x=document.createElement("button");x.type="button";x.className="chip";x.textContent=t;
+    x.onclick=()=>{const e=S.entries[sel]; if(!e) return; if(v) e.matchMine=v; else delete e.matchMine; persist(); renderAuto(); renderLog();}; fix.appendChild(x);};
+  if(r.mine) mk("改回自動判斷",null);
+  else{ if(r.level!=="對得上") mk("我覺得對得上","對得上"); if(r.level!=="沒提到") mk("我覺得沒關係","沒提到"); }
+  box.appendChild(fix);
 }
 function renderForm(){
   chipGroup($("cat"),CATS,"category"); chipGroup($("int"),["1","2","3","4","5"],"intensity");
@@ -912,7 +925,9 @@ $("nextM").onclick=()=>shiftMonth(1);
 $("todayBtn").onclick=()=>goto(todayKey);
 
 $("saveBtn").onclick=()=>{
+  const old=S.entries[sel]||{};
   S.entries[sel]={text:$("text").value.trim(),category:form.category,intensity:form.intensity,feeling:form.feeling,match:form.match,updatedAt:new Date().toISOString()};
+  if(old.matchMine) S.entries[sel].matchMine=old.matchMine;
   if(!S.entries[sel].text&&!form.category&&!form.feeling) delete S.entries[sel];
   if(persist()){setMsg("已儲存 "+md(sel));renderStrip();renderLog();renderWatch();renderAuto();}
   else setMsg("存不進去，手機空間可能滿了。",true);
