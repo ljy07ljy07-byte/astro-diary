@@ -110,11 +110,11 @@ summary{cursor:pointer;font-weight:700}
 <body>
 <div class="wrap">
   <header>
-    <h1>滿天星行事曆</h1>
+    <h1 id="appTitle">滿天星行事曆</h1>
     <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button></div>
   </header>
 
-  <p class="empty" id="welcome" hidden>歡迎使用！在下面填好出生日期、時間和出生地，按「儲存並開始使用」就能進入行事曆。如果有 Claude 給你的匯入連結，貼在最下面的框框按「匯入」也可以。</p>
+  <p class="empty" id="welcome" hidden>歡迎使用！填好出生日期、時間和出生地，按「儲存並開始使用」。</p>
 
   <nav class="strip needs-birth" id="strip" aria-label="選擇日期"></nav>
 
@@ -139,7 +139,7 @@ summary{cursor:pointer;font-weight:700}
       <div>
         <div class="label">實際發生什麼</div>
         <textarea id="text" placeholder="今天發生了什麼？一句話也可以。"></textarea>
-        <p class="hint">想用說的：點鍵盤上的麥克風就能口述。</p>
+        <p class="hint">可以點鍵盤上的麥克風用說的。</p>
       </div>
       <div class="row"><div class="label">類別</div><div class="chips" id="cat"></div></div>
       <div class="row"><div class="label">強度（1 小事～5 影響很大）</div><div class="chips" id="int"></div></div>
@@ -161,7 +161,7 @@ summary{cursor:pointer;font-weight:700}
   </section>
 
   <details id="settings">
-    <summary>出生資料與備份</summary>
+    <summary>出生資料</summary>
     <form class="form" id="birthForm">
       <div class="grid2">
         <label>出生日期<input type="date" id="bDate"></label>
@@ -175,16 +175,16 @@ summary{cursor:pointer;font-weight:700}
         </div>
         <label>時區（台灣是 +8）<input type="number" step="0.5" id="bTz" value="8"></label>
       </div>
-      <div class="natal" id="natal"></div>
+      <div class="natal" id="natal" hidden></div>
       <div><button class="btn2" type="submit" id="birthBtn">更新出生資料</button></div>
     </form>
-    <div class="form">
-      <p class="hint">資料只存在這支手機裡。建議每個月按一次「匯出備份」，換手機時用「匯入備份」還原。</p>
+    <div class="form" id="admin" hidden>
+      <p class="hint">備份與匯入</p>
       <div class="addrow">
         <button class="btn2" type="button" id="exportBtn">匯出備份</button>
         <label class="btn2" style="display:inline-block">匯入備份<input type="file" id="importFile" accept="application/json,.json" hidden></label>
       </div>
-      <label class="hint" for="codeBox">從 Claude 拿到的匯入連結，貼在這裡：</label>
+      <label class="hint" for="codeBox">匯入連結：</label>
       <textarea id="codeBox" style="min-height:60px" placeholder="貼上以 https:// 開頭的匯入連結"></textarea>
       <div><button class="btn2" type="button" id="codeBtn">匯入</button></div>
       <span class="msg" id="bmsg"></span>
@@ -646,7 +646,7 @@ function renderChart(){
   const n=S.notes[sel];
   if(n&&n.card) lines.push({tag:"牌",text:n.card});
   S.periods.filter(p=>p.s<=sel&&sel<=(p.e||p.s)).forEach(p=>lines.push({tag:"提醒",text:p.t+(p.e&&p.e!==p.s?`（${md(p.s)}～${md(p.e)}）`:"")}));
-  lines.forEach(l=>{
+  lines.filter(l=>l.tag!=="景").forEach(l=>{
     const li=document.createElement("li");
     const tag=document.createElement("span"); tag.className="tag"+(l.tag==="大"?" big":l.tag==="牌"||l.tag==="提醒"?" card":l.tag==="景"?" bg":""); tag.textContent=TAGNAME[l.tag];
     const t=document.createElement("span"); t.textContent=l.text;
@@ -744,6 +744,7 @@ $("planForm").addEventListener("submit",e=>{
 });
 
 // ---- 設定 ----
+{let taps=0,timer=null;$("appTitle").addEventListener("click",()=>{taps++;clearTimeout(timer);timer=setTimeout(()=>taps=0,1500);if(taps>=5){taps=0;$("admin").hidden=!$("admin").hidden;$("settings").open=true;$("settings").scrollIntoView({behavior:"smooth"});}});}
 const PLACES=[["基隆市",25.13,121.74],["臺北市",25.03,121.56],["新北市",25.01,121.46],["桃園市",24.99,121.30],["新竹市",24.80,120.97],["新竹縣",24.83,121.01],["苗栗縣",24.56,120.82],["臺中市",24.15,120.67],["彰化縣",24.08,120.54],["南投縣",23.91,120.68],["雲林縣",23.71,120.43],["嘉義市",23.48,120.45],["嘉義縣",23.46,120.25],["臺南市",22.99,120.21],["高雄市",22.63,120.30],["屏東縣",22.67,120.49],["宜蘭縣",24.75,121.75],["花蓮縣",23.99,121.60],["臺東縣",22.76,121.14],["澎湖縣",23.57,119.58],["金門縣",24.43,118.32],["連江縣",26.16,119.95]];
 PLACES.forEach(([n])=>{const o=document.createElement("option");o.textContent=n;$("bPlace").appendChild(o);});
 {const o=document.createElement("option");o.value="other";o.textContent="其他／海外（自己填經緯度）";$("bPlace").appendChild(o);}
