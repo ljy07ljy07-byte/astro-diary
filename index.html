@@ -68,6 +68,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .recall b{color:var(--accent)}
 .recall .r{display:grid;gap:2px}
 .recall small{color:var(--muted)}
+.recall summary{cursor:pointer;color:var(--accent);font-weight:400;font-size:.85rem}
+.recall details{display:grid;gap:6px}
 .plan{padding:16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
 .plist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .plist li{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:.95rem}
@@ -729,18 +731,26 @@ function recallsFor(k){
     const same=Object.keys(now).filter(x=>x in past);
     if(same.length) out.push({d,e:S.entries[d],why:now[same[0]]});
   });
-  return out.slice(0,3);
+  // 影響越大的排越前面，同分的話越近的越前面
+  return out.sort((a,b)=>Number(b.e.intensity)-Number(a.e.intensity)||(a.d<b.d?1:-1));
 }
 function renderRecall(){
   const r=recallsFor(sel), box=$("recall"); box.innerHTML="";
   box.hidden=!r.length; if(!r.length) return;
   const h=document.createElement("b"); h.textContent="回顧：以前出現類似星象時"; box.appendChild(h);
-  r.forEach(x=>{
+  const row=x=>{
     const div=document.createElement("div"); div.className="r";
     const t=document.createElement("span"); t.textContent=`${md(x.d)}　${x.e.text}`+(x.e.feeling?"　"+x.e.feeling:"");
     const w=document.createElement("small"); w.textContent=`當時也是「${x.why}」，影響 ${x.e.intensity}`;
-    div.append(t,w); box.appendChild(div);
-  });
+    div.append(t,w); return div;
+  };
+  r.slice(0,2).forEach(x=>box.appendChild(row(x)));
+  if(r.length>2){
+    const more=document.createElement("details"), sm=document.createElement("summary");
+    sm.textContent=`還有 ${r.length-2} 筆`; more.appendChild(sm);
+    r.slice(2).forEach(x=>more.appendChild(row(x)));
+    box.appendChild(more);
+  }
 }
 function renderWatch(){
   const list=$("watch"); list.innerHTML="";
