@@ -97,6 +97,8 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .plist input{width:20px;height:20px;accent-color:var(--sky);margin:0}
 .kind{font-size:.72rem;font-weight:700;border-radius:4px;padding:1px 6px;background:var(--sky-soft);color:var(--sky);white-space:nowrap}
 .kind.new{background:var(--accent-soft);color:var(--accent)}
+.auto{margin:0;font-size:.9rem;background:var(--sky-soft);border-radius:10px;padding:8px 12px;line-height:1.6}
+.auto b{color:var(--sky)}
 .del{border:0;background:none;cursor:pointer;color:var(--muted);font-size:1.2rem;padding:0 6px}
 .addrow{display:flex;gap:6px;flex-wrap:wrap}
 input[type=text],input[type=number],input[type=date],input[type=time],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
@@ -180,8 +182,8 @@ summary{cursor:pointer;font-weight:700}
       <div class="row"><div class="label">跟什麼有關</div><div class="chips" id="cat"></div></div>
       <div class="row"><div class="label">影響有多大（1 小事～5 大事）</div><div class="chips" id="int"></div></div>
       <div class="row"><div class="label">心情</div><div class="chips" id="feel"></div></div>
-      <div class="row"><div class="label">跟星象說的準不準</div><div class="chips" id="match"></div></div>
       <div class="save"><button class="btn" id="saveBtn" type="button">儲存這一天</button><span class="msg" id="msg"></span></div>
+      <p class="auto" id="auto" hidden></p>
     </section>
   </article>
 
@@ -595,6 +597,10 @@ const PH={
  Pluto:["很專注，能把事情處理到底","情緒很深，容易鑽牛角尖","情緒很深，容易想很多"],
  ASC:["狀態好，容易被看見","跟人相處有點緊繃","想法多，也容易被注意到"],
  MC:["工作順利，表現被看見","工作和家裡兩邊拉扯","工作上的事被看見"]};
+// 每個本命點跟生活哪些面向有關（拿來自動對照日記）
+const AREA={Sun:["心情","工作／學業","健康"],Moon:["家人","心情"],Mercury:["工作／學業","人際"],Venus:["感情","人際","金錢"],
+ Mars:["工作／學業","健康","人際"],Jupiter:["金錢","工作／學業"],Saturn:["工作／學業","健康"],Uranus:["生活瑣事","心情"],
+ Neptune:["心情","健康"],Pluto:["心情","感情"],ASC:["人際","健康"],MC:["工作／學業","家人"]};
 const HARD=new Set(["四分","對分"]), SOFT=new Set(["六分","三分"]);
 const RANK={"合":0,"對分":1,"四分":2,"三分":3,"六分":4};
 function phrase(aspect,pointKey){
@@ -612,16 +618,19 @@ function day(y,m,d,tz,nat){
   });
   lines.push({tag:"月",text:"月亮在"+moon.signs.replace("→","座，晚點走到")+"座"+(moon.hits.length?"，"+[...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,3).map(h=>rel(h.aspect,h.point)).join("，"):"")});
   // 傾向：先看大行運，再看月亮
-  const t=[];
-  major.filter(x=>x.type==="aspect").sort((a,b)=>a.orb-b.orb).slice(0,2).forEach(x=>t.push(phrase(x.aspect,x.point.key)));
-  major.filter(x=>x.type==="station").forEach(x=>t.push(x.body==="水星"&&x.text.includes("逆行")?"手機訊息、文件、約時間都要再確認":x.text));
-  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("新月"))) t.push("適合開始新的事");
-  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) t.push("事情告一段落，情緒比較滿");
-  [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,2).forEach(h=>t.push(phrase(h.aspect,h.point.key)));
+  const t=[], themes=[];
+  const tone=a=>SOFT.has(a)?"good":HARD.has(a)?"bad":"mix";
+  const add=(text,cats,tn)=>{t.push(text);themes.push({text,cats,tone:tn});};
+  major.filter(x=>x.type==="aspect").sort((a,b)=>a.orb-b.orb).slice(0,2).forEach(x=>add(phrase(x.aspect,x.point.key),AREA[x.point.key],tone(x.aspect)));
+  major.filter(x=>x.type==="station").forEach(x=>x.body==="水星"&&x.text.includes("逆行")?add("手機訊息、文件、約時間都要再確認",["工作／學業","人際","生活瑣事"],"bad"):add(x.text,[],"mix"));
+  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("新月"))) add("適合開始新的事",[],"good");
+  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) add("事情告一段落，情緒比較滿",["心情"],"mix");
+  [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,2).forEach(h=>add(phrase(h.aspect,h.point.key),AREA[h.point.key],tone(h.aspect)));
   if(bg.length) lines.push({tag:"景",text:bg.join("、")});
   const seen=new Set(), uniq=[];
   t.forEach(x=>{if(!seen.has(x)){seen.add(x);uniq.push(x);}});
-  return {lines, keys, tendency: uniq.length?uniq.slice(0,3).join("；"):"平平順順的一天"};
+  const shown=new Set(uniq.slice(0,3));
+  return {lines, keys, themes:themes.filter(x=>shown.has(x.text)), tendency: uniq.length?uniq.slice(0,3).join("；"):"平平順順的一天"};
 }
 root.Astro={natal,day,fmt,signOf,SIGNS};
 })(typeof window!=="undefined"?window:globalThis);
@@ -734,9 +743,37 @@ function chipGroup(el,items,field){
     el.appendChild(b);
   });
 }
+// ---- 自動對照：把日記的類別、關鍵字、心情，跟那天星象講到的面向比對（不是 AI，是規則比對）----
+const KW={"工作／學業":/工作|上班|主管|老闆|同事|客戶|開會|報告|專案|考試|上課|學校|作業|面試|加班|升遷|業績/,
+ "感情":/老公|老婆|男友|女友|另一半|約會|曖昧|告白|分手|喜歡|戀/,"人際":/朋友|同學|聚餐|吵架|誤會|聊天|社團|鄰居|口角/,
+ "家人":/媽|爸|小孩|孩子|兒子|女兒|家人|家裡|公婆|爺爺|奶奶|兄弟|姊妹|姐妹/,"金錢":/錢|股票|基金|賺|賠|薪|獎金|花了|買|帳單|房租|中獎|投資/,
+ "健康":/生病|感冒|痛|累|睡|醫|牙|藥|看診|運動|受傷|身體|失眠/,"心情":/心情|難過|開心|焦慮|煩|壓力|哭|生氣|低落|放鬆/,"生活瑣事":/搬家|修|壞掉|遺失|忘記|塞車|遲到|手機|網路|快遞/};
+function autoMatch(k,e){
+  if(!e||!e.text&&!e.category) return null;
+  const cats=new Set(e.category?[e.category]:[]);
+  for(const c in KW) if(KW[c].test(e.text||"")) cats.add(c);
+  const th=dayAstro(k).themes||[];
+  const ft=tone(e)||null;
+  const hits=th.filter(t=>t.cats.some(c=>cats.has(c)));
+  if(!hits.length) return {level:"沒提到"};
+  // 先找好壞也一致的那一條
+  const hit=hits.find(t=>ft&&t.tone===ft)||hits.find(t=>ft&&t.tone==="mix")||hits[0];
+  const same=!!ft&&(hit.tone===ft||hit.tone==="mix");
+  const area=hit.cats.find(c=>cats.has(c));
+  return {level:same?"對得上":"有提到",area,text:hit.text};
+}
+function renderAuto(){
+  const r=autoMatch(sel,S.entries[sel]), box=$("auto");
+  box.hidden=!r; if(!r) return;
+  box.innerHTML="";
+  const b=document.createElement("b");
+  if(r.level==="沒提到"){b.textContent="跟星象對照：沒提到";box.append(b,"　這天的星象沒講到這方面的事，也很正常，留著當紀錄就好。");return;}
+  b.textContent=r.level==="對得上"?"跟星象對照：✓✓ 對得上":"跟星象對照：✓ 有提到";
+  box.append(b,`　這天的星象有提到「${r.area}」方面：${r.text}`+(r.level==="對得上"?"，連好壞都對得上。":"。"));
+}
 function renderForm(){
   chipGroup($("cat"),CATS,"category"); chipGroup($("int"),["1","2","3","4","5"],"intensity");
-  chipGroup($("feel"),FEELS,"feeling"); chipGroup($("match"),MATCH,"match");
+  chipGroup($("feel"),FEELS,"feeling");
 }
 function renderPlans(){
   const ul=$("plans"); ul.innerHTML="";
@@ -769,7 +806,7 @@ function recallsFor(k){
   return out.sort((a,b)=>Number(b.e.intensity)-Number(a.e.intensity)||(a.d<b.d?1:-1));
 }
 // 開心的往事＝好機會（綠），不開心的＝要小心（紅）
-function tone(e){return e.feeling==="開心"?"good":e.feeling==="不開心"?"bad":""}
+function tone(e){return e.feeling==="＋"||e.feeling==="開心"?"good":e.feeling==="－"||e.feeling==="不開心"?"bad":""}
 function pill(e){const c=tone(e); if(!c) return null; const s=document.createElement("span"); s.className="pill "+c; s.textContent=c==="good"?"好事":"要小心"; return s}
 function renderRecall(){
   const r=recallsFor(sel), box=$("recall"); box.innerHTML="";
@@ -854,18 +891,18 @@ function renderLog(){
     const b=document.createElement("button");
     const a=document.createElement("span");a.className="d";a.textContent=md(k);
     const t=document.createElement("span");t.className="t";t.textContent=v.text+(v.feeling?"　"+v.feeling:"");
-    const m=document.createElement("span");m.className="m";m.textContent=v.match||"還沒對照";
+    const m=document.createElement("span");m.className="m";m.textContent=autoMatch(k,v)?.level||"";
     b.append(a,t,m); b.onclick=()=>{select(k);scrollTo({top:0,behavior:"smooth"});};
     log.appendChild(b);
   });
-  const c=x=>list.filter(([,v])=>v.match===x).length;
-  $("stats").innerHTML=`<span>記了 <b>${list.length}</b> 天</span><span>很準 <b>${c("很準")}</b></span><span>有點準 <b>${c("有點準")}</b></span><span>不太準 <b>${c("不太準")}</b></span>`;
+  const c=x=>list.filter(([k,v])=>autoMatch(k,v)?.level===x).length;
+  $("stats").innerHTML=`<span>記了 <b>${list.length}</b> 天</span><span>對得上 <b>${c("對得上")}</b></span><span>有提到 <b>${c("有提到")}</b></span><span>沒提到 <b>${c("沒提到")}</b></span>`;
 }
 function select(k){
   sel=k; const e=S.entries[k]||{};
   form={category:e.category||null,intensity:e.intensity||null,feeling:e.feeling||null,match:e.match||null};
   $("text").value=e.text||"";
-  renderStrip(); renderChart(); renderRecall(); renderPlans(); renderForm();
+  renderStrip(); renderChart(); renderRecall(); renderPlans(); renderForm(); renderAuto();
   setMsg(e.updatedAt?"上次儲存："+new Date(e.updatedAt).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"");
 }
 function goto(k){vy=Number(k.slice(0,4));vm=Number(k.slice(5,7));select(k);renderLog();}
@@ -877,7 +914,7 @@ $("todayBtn").onclick=()=>goto(todayKey);
 $("saveBtn").onclick=()=>{
   S.entries[sel]={text:$("text").value.trim(),category:form.category,intensity:form.intensity,feeling:form.feeling,match:form.match,updatedAt:new Date().toISOString()};
   if(!S.entries[sel].text&&!form.category&&!form.feeling) delete S.entries[sel];
-  if(persist()){setMsg("已儲存 "+md(sel));renderStrip();renderLog();renderWatch();}
+  if(persist()){setMsg("已儲存 "+md(sel));renderStrip();renderLog();renderWatch();renderAuto();}
   else setMsg("存不進去，手機空間可能滿了。",true);
 };
 $("planForm").addEventListener("submit",e=>{
