@@ -43,18 +43,27 @@ h1{font-family:var(--display);font-size:1.5rem;margin:0;letter-spacing:.04em}
 .tagline{margin:2px 0 0;font-size:.8rem;color:var(--muted);line-height:1.5}
 .mnav{display:flex;align-items:center;gap:4px;font-variant-numeric:tabular-nums;color:var(--muted)}
 .mnav button{font:inherit;font-size:1.2rem;border:0;background:none;color:var(--sky);padding:4px 10px;cursor:pointer}
-.strip{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x proximity}
-.day{flex:0 0 auto;width:46px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:6px 0 4px;display:grid;justify-items:center;cursor:pointer;scroll-snap-align:center;font:inherit}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:4px 0 6px}
+.cal .wh{text-align:center;font-size:.72rem;color:var(--muted);padding-bottom:2px}
+.day{position:relative;min-width:0;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:9px;padding:5px 0 3px;display:grid;justify-items:center;cursor:pointer;font:inherit}
+.day .sky{position:absolute;top:1px;right:3px;font-size:.6rem;color:var(--accent);line-height:1}
+.day.sel .sky{color:var(--paper)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.72rem;color:var(--muted);margin:0 0 12px}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px}
+.mnav .today-btn{font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin-left:4px}
+.remind{background:var(--accent-soft);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:.92rem;display:grid;gap:4px}
+.remind b{color:var(--accent)}
+.ics{border:0;background:none;cursor:pointer;font-size:1rem;padding:0 2px}
 .day b{font-size:1.05rem;font-variant-numeric:tabular-nums;line-height:1.2}
 .day small{font-size:.7rem;color:var(--muted)}
 .day .dots{display:flex;gap:3px;margin-top:2px;height:6px}
 .day i,.day u{width:6px;height:6px;border-radius:50%;background:transparent}
 .day.has i{background:var(--accent)}
-.day.plan u{background:var(--sky)}
+.day.hasplan u{background:var(--sky)}
 .day.today{border-color:var(--sky)}
 .day.sel{background:var(--sky);color:var(--paper);border-color:var(--sky)}
 .day.sel small{color:var(--paper)}
-.day.sel.plan u{background:var(--paper)}
+.day.sel.hasplan u{background:var(--paper)}
 button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .page{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .chart{background:var(--sky-soft);padding:16px;display:grid;gap:10px}
@@ -82,7 +91,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .recall details{display:grid;gap:6px}
 .plan{padding:16px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
 .plist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.plist li{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:.95rem}
+.plist li{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:8px;align-items:center;font-size:.95rem}
 .plist li.done .pt{text-decoration:line-through;color:var(--muted)}
 .plist .pt{min-width:0;overflow-wrap:anywhere}
 .plist input{width:20px;height:20px;accent-color:var(--sky);margin:0}
@@ -129,7 +138,7 @@ summary{cursor:pointer;font-weight:700}
 <div class="wrap">
   <header>
     <div class="brand"><h1 id="appTitle">滿天星行事曆</h1><p class="tagline">記下的每一天，都會成為照亮前路的星。</p></div>
-    <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button></div>
+    <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button><button class="today-btn" id="todayBtn" type="button">今天</button></div>
   </header>
 
   <div class="story" id="welcome" hidden>
@@ -140,7 +149,9 @@ summary{cursor:pointer;font-weight:700}
     <p class="go">填好下面的出生資料，點亮你的第一顆星。</p>
   </div>
 
-  <nav class="strip needs-birth" id="strip" aria-label="選擇日期"></nav>
+  <div class="remind needs-birth" id="remind" hidden></div>
+  <nav class="cal needs-birth" id="strip" aria-label="選擇日期"></nav>
+  <p class="legend needs-birth"><span><i style="background:var(--sky)"></i>有安排</span><span><i style="background:var(--accent)"></i>有日記</span><span><b style="color:var(--accent)">✦</b> 新月、滿月、水逆這類大日子</span></p>
 
   <article class="page needs-birth">
     <section class="chart">
@@ -672,19 +683,24 @@ const md=k=>Number(k.slice(5,7))+"/"+Number(k.slice(8));
 
 function setMsg(t,err){$("msg").textContent=t;$("msg").className="msg"+(err?" err":"");}
 
+// 新月、滿月、行星停滯轉向這種日子，在月曆上標一顆星
+function bigDay(k){const a=dayAstro(k);return Object.keys(a.keys).some(x=>x.startsWith("st|"))||a.lines.some(l=>l.tag==="大"&&/新月|滿月/.test(l.text));}
 function renderStrip(){
   $("monthLabel").textContent=`${vy} 年 ${vm} 月`;
   const s=$("strip"); s.innerHTML="";
+  for(const w of WD){const h=document.createElement("span");h.className="wh";h.textContent=w;s.appendChild(h);}
+  const first=new Date(Date.UTC(vy,vm-1,1)).getUTCDay();
+  for(let i=0;i<first;i++) s.appendChild(document.createElement("span"));
   for(let d=1;d<=daysIn(vy,vm);d++){
     const k=K(vy,vm,d);
     const b=document.createElement("button");
-    b.className="day"+(k===sel?" sel":"")+(k===todayKey?" today":"")+(S.entries[k]?.text?" has":"")+(S.plans[k]?.length?" plan":"");
-    b.innerHTML=`<b>${d}</b><small>${wd(k)}</small><span class="dots"><u></u><i></i></span>`;
+    b.className="day"+(k===sel?" sel":"")+(k===todayKey?" today":"")+(S.entries[k]?.text?" has":"")+(S.plans[k]?.length?" hasplan":"");
+    b.innerHTML=`<b>${d}</b><span class="dots"><u></u><i></i></span>`+(bigDay(k)?'<span class="sky">✦</span>':"");
     b.setAttribute("aria-label",`${vm} 月 ${d} 日 星期${wd(k)}`);
     b.onclick=()=>select(k);
     s.appendChild(b);
-    if(k===sel) requestAnimationFrame(()=>b.scrollIntoView({inline:"center",block:"nearest"}));
   }
+  $("todayBtn").hidden=sel===todayKey;
 }
 function renderChart(){
   const a=dayAstro(sel);
@@ -734,7 +750,9 @@ function renderPlans(){
     const t=document.createElement("span"); t.className="pt"; t.textContent=it.text;
     const del=document.createElement("button"); del.className="del"; del.type="button"; del.textContent="×"; del.setAttribute("aria-label","刪除");
     del.onclick=()=>{S.plans[sel]=items.filter(x=>x!==it); if(!S.plans[sel].length) delete S.plans[sel]; savePlans();};
-    li.append(cb,k,t,del); ul.appendChild(li);
+    const cal=document.createElement("button"); cal.className="ics"; cal.type="button"; cal.textContent="🔔"; cal.setAttribute("aria-label","加到手機行事曆"); cal.title="加到手機行事曆";
+    cal.onclick=()=>addToCalendar(sel,it);
+    li.append(cb,k,t,cal,del); ul.appendChild(li);
   });
 }
 // ---- 回顧：類似星象再出現時，提醒以前記下的大事（影響 3 以上）----
@@ -791,7 +809,28 @@ function renderWatch(){
     list.appendChild(b);
   });
 }
-function savePlans(){ if(!persist()) setMsg("存不進去，手機空間可能滿了。",true); renderPlans(); renderStrip(); renderUpcoming(); }
+// 產生 .ics 檔，手機會問要不要加到內建行事曆；前一天早上 9 點跳提醒
+function addToCalendar(k,it){
+  const esc=x=>String(x).replace(/[\\;,]/g,m=>"\\"+m).replace(/\n/g,"\\n");
+  const d=k.replace(/-/g,""), n=new Date(Date.UTC(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8))+86400e3).toISOString().slice(0,10).replace(/-/g,"");
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//mantianxing//TW","BEGIN:VEVENT","UID:"+it.id+"-"+d+"@mantianxing","DTSTAMP:"+stamp,
+    "DTSTART;VALUE=DATE:"+d,"DTEND;VALUE=DATE:"+n,"SUMMARY:"+esc(it.text),"DESCRIPTION:"+esc("那天的星象："+dayAstro(k).tendency+"（滿天星行事曆）"),
+    "BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:-PT15H","DESCRIPTION:"+esc("明天："+it.text),"END:VALARM",
+    "BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:PT8H","DESCRIPTION:"+esc("今天："+it.text),"END:VALARM",
+    "END:VEVENT","END:VCALENDAR"].join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"})); a.download=it.text.slice(0,20)+".ics";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+}
+// 打開 App 時，最上面提醒今天、明天要做的事
+function renderRemind(){
+  const tm=new Date(Date.UTC(+todayKey.slice(0,4),+todayKey.slice(5,7)-1,+todayKey.slice(8))+86400e3).toISOString().slice(0,10);
+  const box=$("remind"); box.innerHTML="";
+  [[todayKey,"今天"],[tm,"明天"]].forEach(([k,w])=>{const items=(S.plans[k]||[]).filter(x=>!x.done); if(!items.length) return;
+    const r=document.createElement("div"); const b=document.createElement("b"); b.textContent=`🔔 ${w}要做：`; r.append(b,items.map(x=>x.text).join("、")); box.appendChild(r);});
+  box.hidden=!box.children.length;
+}
+function savePlans(){ if(!persist()) setMsg("存不進去，手機空間可能滿了。",true); renderPlans(); renderStrip(); renderUpcoming(); renderRemind(); }
 function renderUpcoming(){
   const up=$("up"); up.innerHTML="";
   const ks=Object.keys(S.plans).filter(k=>k>=todayKey&&S.plans[k].length).sort().slice(0,14);
@@ -833,6 +872,7 @@ function goto(k){vy=Number(k.slice(0,4));vm=Number(k.slice(5,7));select(k);rende
 function shiftMonth(n){vm+=n;if(vm<1){vm=12;vy--;}if(vm>12){vm=1;vy++;}goto(K(vy,vm,1)===todayKey.slice(0,8)+"01"?todayKey:K(vy,vm,1));}
 $("prevM").onclick=()=>shiftMonth(-1);
 $("nextM").onclick=()=>shiftMonth(1);
+$("todayBtn").onclick=()=>goto(todayKey);
 
 $("saveBtn").onclick=()=>{
   S.entries[sel]={text:$("text").value.trim(),category:form.category,intensity:form.intensity,feeling:form.feeling,match:form.match,updatedAt:new Date().toISOString()};
@@ -910,7 +950,7 @@ function start(){
   $("welcome").hidden=ready;
   fillBirth();
   $("birthBtn").textContent=ready?"更新出生資料":"點亮第一顆星";
-  if(ready){goto(todayKey);renderUpcoming();renderWatch();$("settings").open=false;} else $("settings").open=true;
+  if(ready){goto(todayKey);renderUpcoming();renderWatch();renderRemind();$("settings").open=false;} else $("settings").open=true;
 }
 start();
 if("serviceWorker" in navigator && location.protocol==="https:"){navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!reloaded&&navigator.serviceWorker.controller){reloaded=true;location.reload();}});}
