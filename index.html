@@ -122,42 +122,42 @@ summary{cursor:pointer;font-weight:700}
 
   <article class="page needs-birth">
     <section class="chart">
-      <div class="label">星象怎麼說</div>
+      <div class="label">今天的星象</div>
       <div class="date" id="date"></div>
       <ul class="astro" id="astro"></ul>
       <div class="tend" id="tend"></div>
       <div class="note" id="note" hidden></div>
     </section>
     <section class="plan">
-      <div class="label">這天的安排</div>
+      <div class="label">這天要做的事</div>
       <ul class="plist" id="plans"></ul>
       <form class="addrow" id="planForm">
-        <input type="text" id="planText" placeholder="例如：打電話給教育局追進度" autocomplete="off">
+        <input type="text" id="planText" placeholder="例如：跟朋友吃飯、交報告" autocomplete="off">
         <select id="planKind" aria-label="種類"><option>工作</option><option>新計畫</option><option>私事</option></select>
         <button class="btn2" type="submit">加入</button>
       </form>
     </section>
     <section class="life">
       <div>
-        <div class="label">實際發生什麼</div>
-        <textarea id="text" placeholder="今天發生了什麼？一句話也可以。"></textarea>
+        <div class="label">這天發生了什麼</div>
+        <textarea id="text" placeholder="寫一句話就好，例如：被主管稱讚、跟家人吵架"></textarea>
         <p class="hint">可以點鍵盤上的麥克風用說的。</p>
       </div>
-      <div class="row"><div class="label">類別</div><div class="chips" id="cat"></div></div>
-      <div class="row"><div class="label">強度（1 小事～5 影響很大）</div><div class="chips" id="int"></div></div>
-      <div class="row"><div class="label">感受</div><div class="chips" id="feel"></div></div>
-      <div class="row"><div class="label">跟星象吻合嗎</div><div class="chips" id="match"></div></div>
+      <div class="row"><div class="label">跟什麼有關</div><div class="chips" id="cat"></div></div>
+      <div class="row"><div class="label">影響有多大（1 小事～5 大事）</div><div class="chips" id="int"></div></div>
+      <div class="row"><div class="label">心情</div><div class="chips" id="feel"></div></div>
+      <div class="row"><div class="label">跟星象說的準不準</div><div class="chips" id="match"></div></div>
       <div class="save"><button class="btn" id="saveBtn" type="button">儲存這一天</button><span class="msg" id="msg"></span></div>
     </section>
   </article>
 
   <section class="needs-birth">
-    <h2>接下來的安排</h2>
+    <h2>接下來要做的事</h2>
     <div class="list" id="up"></div>
   </section>
 
   <section class="needs-birth">
-    <h2>這個月的紀錄</h2>
+    <h2>這個月的日記</h2>
     <div class="stats" id="stats"></div>
     <div class="list" id="log"></div>
   </section>
@@ -488,6 +488,10 @@ function natal(b){
 const signOf=l=>SIGNS[Math.floor(norm(l)/30)];
 const fmt=l=>{const s=norm(l)%30;return signOf(l)+" "+Math.floor(s)+"°"+String(Math.round((s%1)*60)).padStart(2,"0")+"′";};
 
+// 白話相位
+const VERB={"合":"疊在一起","六分":"互相幫一把","三分":"很合拍","四分":"互相卡住","對分":"正面對上"};
+const PT={ASC:"上升點",MC:"天頂（事業點）"};
+const rel=(aspect,p)=>`和你的${PT[p.key]||p.name}${VERB[aspect]}`;
 // 一天的範圍（以時區 tz 的當地 0:00～24:00）
 function dayRange(y,m,d,tz){const s=new Date(Date.UTC(y,m-1,d)-tz*3600e3);return [s,new Date(s.getTime()+86400e3)];}
 
@@ -515,7 +519,7 @@ function majorDay(y,m,d,tz,nat){
     const v1=sdiff(l,lp), v2=sdiff(ln,l);
     const retro=v2<0;
     let station=null;
-    if(k!=="Sun"&&Math.sign(v1)!==Math.sign(v2)) station=v2<0?"逆行開始":"恢復順行";
+    if(k!=="Sun"&&Math.sign(v1)!==Math.sign(v2)) station=v2<0?"開始逆行":"恢復順行";
     if(station) out.push({type:"station",body:n,text:n+station});
     for(const p of nat){
       for(const [ang,name] of ASPECTS){
@@ -531,8 +535,8 @@ function majorDay(y,m,d,tz,nat){
       const ml=lon("Moon",t.date); const local=new Date(t.date.getTime()+tz*3600e3);
       const hh=String(local.getUTCHours()).padStart(2,"0")+":"+String(local.getUTCMinutes()).padStart(2,"0");
       const asp=[];
-      for(const p of nat) for(const [ang,an] of ASPECTS){ if(Math.abs(Math.abs(sdiff(ml,p.lon))-ang)<=3) asp.push(an+"本命"+p.name); }
-      out.unshift({type:"lunation",text:`${name}（${hh}，${signOf(ml)}）`+(asp.length?asp.slice(0,2).join("、"):"")});
+      for(const p of nat) for(const [ang,an] of ASPECTS){ if(Math.abs(Math.abs(sdiff(ml,p.lon))-ang)<=3) asp.push(rel(an,p)); }
+      out.unshift({type:"lunation",text:`${name}（${hh}，在${signOf(ml)}座）`+(asp.length?"，"+asp.slice(0,2).join("，"):"")});
     }
   }
   return out;
@@ -540,18 +544,18 @@ function majorDay(y,m,d,tz,nat){
 
 // 傾向文字：依本命點與相位性質（順／緊／合）
 const PH={
- Sun:["精神好、做事有成果","有點累、想法和別人不一樣","精神集中在自己身上"],
- Moon:["情緒穩、和家人相處好","情緒敏感、容易被挑起","情緒比較敏感，需要被理解"],
- Mercury:["溝通順、適合處理文件","溝通容易誤會，文件要再確認","想法多、話多"],
- Venus:["人際和氣、有好感","人際上容易有小比較或不愉快","人際、金錢的事比較多"],
- Mars:["行動力強、做事有效率","容易急躁、和人起衝突","行動力強，也容易急"],
- Jupiter:["順，容易得到幫助","容易想太多、做太多","順，運氣不錯"],
- Saturn:["穩定、做事有成果","覺得事情卡、有壓力","覺得被要求、有壓力"],
- Uranus:["有新點子","有突發狀況","想要改變"],
- Neptune:["直覺敏銳、有靈感","消息不清楚、容易誤會","容易恍神、想像力強"],
- Pluto:["專注、能深入處理事情","情緒深、容易想很多或有控制感","情緒深、容易想很多"],
- ASC:["狀態好、被看見","人際上有點緊張","想法多、被看見"],
- MC:["工作順、被看見","工作和家庭兩邊拉扯","工作的事被看見"]};
+ Sun:["精神不錯，做事容易有成果","有點累，想法容易跟別人不一樣","注意力都放在自己身上"],
+ Moon:["心情穩定，適合跟家人相處","情緒比較容易被挑起","心比較軟、比較敏感，希望有人懂你"],
+ Mercury:["講話、溝通都順，適合處理文件","容易講錯話或被誤會，文件多看一次","腦袋轉很快，話也多"],
+ Venus:["跟人相處融洽，容易有好感","容易跟人比較，或有點小不愉快","人際和花錢的事比較多"],
+ Mars:["衝勁十足，做事很有效率","容易急、容易跟人起口角","很有衝勁，但也容易急"],
+ Jupiter:["事情順，容易有人幫忙","容易想太多、答應太多","運氣不錯，事情順"],
+ Saturn:["穩穩的，努力會有成果","覺得事情卡卡的、壓力大","覺得被要求、有壓力"],
+ Uranus:["會冒出新點子","可能有突發狀況","很想改變現狀"],
+ Neptune:["直覺很準、有靈感","消息容易不清楚，小心誤會","容易恍神，想像力很豐富"],
+ Pluto:["很專注，能把事情處理到底","情緒很深，容易鑽牛角尖","情緒很深，容易想很多"],
+ ASC:["狀態好，容易被看見","跟人相處有點緊繃","想法多，也容易被注意到"],
+ MC:["工作順利，表現被看見","工作和家裡兩邊拉扯","工作上的事被看見"]};
 const HARD=new Set(["四分","對分"]), SOFT=new Set(["六分","三分"]);
 const RANK={"合":0,"對分":1,"四分":2,"三分":3,"六分":4};
 function phrase(aspect,pointKey){
@@ -560,34 +564,34 @@ function phrase(aspect,pointKey){
 function day(y,m,d,tz,nat){
   const moon=moonDay(y,m,d,tz,nat), major=majorDay(y,m,d,tz,nat);
   const lines=[], bg=[];
-  const said=x=>`${x.retro?"逆行":""}${x.body}${x.aspect}本命${x.point.name}`;
+  const said=x=>`${x.body}${x.retro?"（逆行中）":""}${rel(x.aspect,x.point)}`;
   major.forEach(x=>{
     if(x.type==="aspect") lines.push({tag:"大",text:said(x)});
     else if(x.type==="bg") bg.push(said(x));
     else lines.push({tag:"大",text:x.text});
   });
-  lines.push({tag:"月",text:"月亮"+moon.signs+(moon.hits.length?"，"+moon.hits.map(h=>h.aspect+"本命"+h.point.name).join("、"):"")});
+  lines.push({tag:"月",text:"月亮在"+moon.signs.replace("→","座，晚點走到")+"座"+(moon.hits.length?"，"+[...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,3).map(h=>rel(h.aspect,h.point)).join("，"):"")});
   // 傾向：先看大行運，再看月亮
   const t=[];
   major.filter(x=>x.type==="aspect").sort((a,b)=>a.orb-b.orb).slice(0,2).forEach(x=>t.push(phrase(x.aspect,x.point.key)));
-  major.filter(x=>x.type==="station").forEach(x=>t.push(x.body==="水星"&&x.text.includes("逆行")?"文件、訊息要再確認":x.text));
+  major.filter(x=>x.type==="station").forEach(x=>t.push(x.body==="水星"&&x.text.includes("逆行")?"手機訊息、文件、約時間都要再確認":x.text));
   if(major.some(x=>x.type==="lunation"&&x.text.startsWith("新月"))) t.push("適合開始新的事");
-  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) t.push("事情到一個段落，情緒比較滿");
+  if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) t.push("事情告一段落，情緒比較滿");
   [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,2).forEach(h=>t.push(phrase(h.aspect,h.point.key)));
   if(bg.length) lines.push({tag:"景",text:bg.join("、")});
   const seen=new Set(), uniq=[];
   t.forEach(x=>{if(!seen.has(x)){seen.add(x);uniq.push(x);}});
-  return {lines, tendency: uniq.length?uniq.slice(0,3).join("；"):"平穩的一天"};
+  return {lines, tendency: uniq.length?uniq.slice(0,3).join("；"):"平平順順的一天"};
 }
 root.Astro={natal,day,fmt,signOf,SIGNS};
 })(typeof window!=="undefined"?window:globalThis);
 </script>
 <script>
-const CATS=["補習班／工作","人際衝突","官方／文件","金錢","健康","家庭","情緒"];
-const FEELS=[["＋","好"],["－","壞"],["＝","中性"]];
-const MATCH=["高","中","低","無關"];
+const CATS=["工作／學業","感情","人際","家人","金錢","健康","心情","生活瑣事"];
+const FEELS=[["＋","開心"],["－","不開心"],["＝","普通"]];
+const MATCH=["很準","有點準","不太準","沒關係"];
 const WD="日一二三四五六";
-const TAGNAME={大:"重要行運",月:"月亮",牌:"塔羅",景:"背景",提醒:"Claude 提醒"};
+const TAGNAME={大:"大方向",月:"月亮",牌:"塔羅",景:"背景",提醒:"提醒"};
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,"0");
 const K=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
@@ -598,6 +602,11 @@ let S;
 try{S=JSON.parse(localStorage.getItem(STORE)||"null")}catch(e){S=null}
 if(!S) S={birth:null,entries:{},plans:{},notes:{}};
 S.notes=S.notes||{}; S.periods=S.periods||[];
+function migrate(){
+  const C={"補習班／工作":"工作／學業","人際衝突":"人際","官方／文件":"生活瑣事","家庭":"家人","情緒":"心情"}, M={"高":"很準","中":"有點準","低":"不太準","無關":"沒關係"};
+  for(const k in S.entries){const e=S.entries[k]; if(C[e.category]) e.category=C[e.category]; if(M[e.match]) e.match=M[e.match];}
+}
+migrate();
 // 一次性匯入連結：#data=<base64url JSON>（資料只在網址的 # 後面，不會傳到伺服器）
 function importCode(code){
     const b64=code.slice(code.indexOf("#data=")+6).trim().replace(/-/g,"+").replace(/_/g,"/");
@@ -606,7 +615,7 @@ function importCode(code){
     if(d.birth) S.birth=d.birth;
     if(Array.isArray(d.periods)) S.periods=d.periods;
     for(const f of ["entries","plans","notes"]) for(const k in (d[f]||{})) if(!(k in S[f])) S[f][k]=d[f][k];
-    persist();
+    migrate(); persist();
 }
 if(location.hash.startsWith("#data=")){
   try{importCode(location.hash);}catch(e){}
@@ -664,8 +673,8 @@ function renderChart(){
     const t=document.createElement("span"); t.textContent=l.text;
     li.append(tag,t); ul.appendChild(li);
   });
-  $("tend").innerHTML=""; $("tend").append(document.createTextNode("可能傾向："+a.tendency));
-  const em=document.createElement("em"); em.textContent="自動推論"; $("tend").appendChild(em);
+  $("tend").innerHTML=""; $("tend").append(document.createTextNode("今天可能："+a.tendency));
+  const em=document.createElement("em"); em.textContent="僅供參考"; $("tend").appendChild(em);
   if(n&&n.t){$("note").hidden=false;$("note").innerHTML="";$("note").append(document.createTextNode("Claude 的解讀："+n.t));const e2=document.createElement("em");e2.textContent="推論";$("note").appendChild(e2);}
   else $("note").hidden=true;
 }
@@ -687,7 +696,7 @@ function renderForm(){
 function renderPlans(){
   const ul=$("plans"); ul.innerHTML="";
   const items=S.plans[sel]||[];
-  if(!items.length){const p=document.createElement("li");p.className="empty";p.style.display="block";p.textContent="這天還沒有安排。";ul.appendChild(p);}
+  if(!items.length){const p=document.createElement("li");p.className="empty";p.style.display="block";p.textContent="還沒有安排。";ul.appendChild(p);}
   items.forEach(it=>{
     const li=document.createElement("li"); if(it.done) li.className="done";
     const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!it.done; cb.id="p-"+it.id; cb.setAttribute("aria-label","完成");
@@ -703,13 +712,13 @@ function savePlans(){ if(!persist()) setMsg("存不進去，手機空間可能�
 function renderUpcoming(){
   const up=$("up"); up.innerHTML="";
   const ks=Object.keys(S.plans).filter(k=>k>=todayKey&&S.plans[k].length).sort().slice(0,14);
-  if(!ks.length){up.innerHTML='<p class="empty">還沒有安排。點一個日期，在「這天的安排」加入工作或新計畫，就能和當天星象一起看。</p>';return;}
+  if(!ks.length){up.innerHTML='<p class="empty">還沒有安排。點一個日期，加上要做的事，就能順便看那天的星象。</p>';return;}
   ks.forEach(k=>{
     const b=document.createElement("button");
     const d=document.createElement("span"); d.className="d"; d.textContent=md(k);
     const body=document.createElement("span"); body.className="t";
     S.plans[k].forEach(it=>{const r=document.createElement("span"); r.textContent=(it.done?"✓ ":"")+"〔"+it.kind+"〕"+it.text; body.appendChild(r);});
-    const tn=document.createElement("span"); tn.className="tn"; tn.textContent="星象傾向："+dayAstro(k).tendency; body.appendChild(tn);
+    const tn=document.createElement("span"); tn.className="tn"; tn.textContent="那天："+dayAstro(k).tendency; body.appendChild(tn);
     b.append(d,body,document.createElement("span")); b.onclick=()=>{goto(k);scrollTo({top:0,behavior:"smooth"});};
     up.appendChild(b);
   });
@@ -718,17 +727,17 @@ function renderLog(){
   const pre=K(vy,vm,1).slice(0,8);
   const list=Object.entries(S.entries).filter(([k,v])=>k.startsWith(pre)&&v.text).sort();
   const log=$("log"); log.innerHTML="";
-  if(!list.length){log.innerHTML='<p class="empty">這個月還沒有紀錄。點上面的日期，寫下那天發生的事，就會出現在這裡。</p>';$("stats").textContent="";return;}
+  if(!list.length){log.innerHTML='<p class="empty">這個月還沒寫日記。點上面的日期，寫下那天發生的事，就會出現在這裡。</p>';$("stats").textContent="";return;}
   list.forEach(([k,v])=>{
     const b=document.createElement("button");
     const a=document.createElement("span");a.className="d";a.textContent=md(k);
     const t=document.createElement("span");t.className="t";t.textContent=v.text+(v.feeling?"　"+v.feeling:"");
-    const m=document.createElement("span");m.className="m";m.textContent=v.match?"吻合 "+v.match:"未對照";
+    const m=document.createElement("span");m.className="m";m.textContent=v.match||"還沒對照";
     b.append(a,t,m); b.onclick=()=>{select(k);scrollTo({top:0,behavior:"smooth"});};
     log.appendChild(b);
   });
   const c=x=>list.filter(([,v])=>v.match===x).length;
-  $("stats").innerHTML=`<span>已記 <b>${list.length}</b> 天</span><span>吻合高 <b>${c("高")}</b></span><span>中 <b>${c("中")}</b></span><span>低 <b>${c("低")}</b></span><span>無關 <b>${c("無關")}</b></span>`;
+  $("stats").innerHTML=`<span>記了 <b>${list.length}</b> 天</span><span>很準 <b>${c("很準")}</b></span><span>有點準 <b>${c("有點準")}</b></span><span>不太準 <b>${c("不太準")}</b></span>`;
 }
 function select(k){
   sel=k; const e=S.entries[k]||{};
