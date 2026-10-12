@@ -239,6 +239,10 @@ summary{cursor:pointer;font-weight:700}
       </div>
       <div class="natal" id="natal" hidden></div>
       <div><button class="btn2" type="submit" id="birthBtn">更新出生資料</button></div>
+      <div class="foot" id="firstNote" hidden>
+        <p>星象內容僅供參考與自我記錄，不能取代醫療、法律、投資等專業意見；日子怎麼過，還是由你自己決定。</p>
+        <p>🔒 你的日記和出生資料只存在這支手機裡，不會上傳，我們收集不到、也看不到。</p>
+      </div>
     </form>
     <div class="form" id="admin" hidden>
       <p class="hint">備份與匯入</p>
@@ -252,7 +256,7 @@ summary{cursor:pointer;font-weight:700}
       <span class="msg" id="bmsg"></span>
     </div>
   </details>
-  <footer class="foot">
+  <footer class="foot needs-birth">
     <p>星象內容僅供參考與自我記錄，不能取代醫療、法律、投資等專業意見；日子怎麼過，還是由你自己決定。</p>
     <p>🔒 你的日記和出生資料只存在這支手機裡，不會上傳，我們收集不到、也看不到。換手機或清除瀏覽器資料前，記得先備份。</p>
   </footer>
@@ -1060,7 +1064,7 @@ function start(){
   fillBirth();
   $("birthBtn").textContent=ready?"更新出生資料":"點亮第一顆星";
   // 出生資料填過就收起來，要改從右上角 ⚙ 打開
-  $("settings").hidden=ready;
+  $("settings").hidden=ready; $("firstNote").hidden=ready;
   if(ready){goto(todayKey);renderUpcoming();renderWatch();renderRemind();$("settings").open=false;} else $("settings").open=true;
 }
 start();
