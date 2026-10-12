@@ -569,7 +569,7 @@ const CATS=["補習班／工作","人際衝突","官方／文件","金錢","健�
 const FEELS=[["＋","好"],["－","壞"],["＝","中性"]];
 const MATCH=["高","中","低","無關"];
 const WD="日一二三四五六";
-const TAGNAME={大:"重要行運",月:"月亮",牌:"塔羅",景:"背景"};
+const TAGNAME={大:"重要行運",月:"月亮",牌:"塔羅",景:"背景",提醒:"Claude 提醒"};
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,"0");
 const K=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
@@ -579,13 +579,14 @@ const STORE="astro-diary-v1";
 let S;
 try{S=JSON.parse(localStorage.getItem(STORE)||"null")}catch(e){S=null}
 if(!S) S={birth:null,entries:{},plans:{},notes:{}};
-S.notes=S.notes||{};
+S.notes=S.notes||{}; S.periods=S.periods||[];
 // 一次性匯入連結：#data=<base64url JSON>（資料只在網址的 # 後面，不會傳到伺服器）
 function importCode(code){
     const b64=code.slice(code.indexOf("#data=")+6).trim().replace(/-/g,"+").replace(/_/g,"/");
     const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
     const d=JSON.parse(new TextDecoder().decode(bytes));
     if(d.birth) S.birth=d.birth;
+    if(Array.isArray(d.periods)) S.periods=d.periods;
     for(const f of ["entries","plans","notes"]) for(const k in (d[f]||{})) if(!(k in S[f])) S[f][k]=d[f][k];
     persist();
 }
@@ -638,9 +639,10 @@ function renderChart(){
   const lines=[...a.lines];
   const n=S.notes[sel];
   if(n&&n.card) lines.push({tag:"牌",text:n.card});
+  S.periods.filter(p=>p.s<=sel&&sel<=(p.e||p.s)).forEach(p=>lines.push({tag:"提醒",text:p.t+(p.e&&p.e!==p.s?`（${md(p.s)}～${md(p.e)}）`:"")}));
   lines.forEach(l=>{
     const li=document.createElement("li");
-    const tag=document.createElement("span"); tag.className="tag"+(l.tag==="大"?" big":l.tag==="牌"?" card":l.tag==="景"?" bg":""); tag.textContent=TAGNAME[l.tag];
+    const tag=document.createElement("span"); tag.className="tag"+(l.tag==="大"?" big":l.tag==="牌"||l.tag==="提醒"?" card":l.tag==="景"?" bg":""); tag.textContent=TAGNAME[l.tag];
     const t=document.createElement("span"); t.textContent=l.text;
     li.append(tag,t); ul.appendChild(li);
   });
@@ -770,7 +772,7 @@ $("importFile").onchange=async e=>{
   try{
     const d=JSON.parse(await f.text());
     if(!d.entries||!d.plans||!d.birth) throw 0;
-    S=d; S.notes=S.notes||{}; persist(); NAT=Astro.natal(S.birth); for(const k in cache) delete cache[k];
+    S=d; S.notes=S.notes||{}; S.periods=S.periods||[]; persist(); NAT=Astro.natal(S.birth); for(const k in cache) delete cache[k];
     start(); $("bmsg").textContent="已匯入備份。";
   }catch(err){$("bmsg").textContent="這個檔案不是滿天星行事曆的備份。";}
   e.target.value="";
