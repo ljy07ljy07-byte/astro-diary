@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#1d2340">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="滿天星">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
@@ -52,6 +53,8 @@ h1{font-family:var(--display);font-size:1.5rem;margin:0;letter-spacing:.04em}
 .legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px}
 .mnav .gear{font-size:1rem;color:var(--muted);margin-left:auto;padding:4px 6px}
 .mnav .today-btn{font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin-left:4px}
+.install{background:var(--sky-soft);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:.88rem;line-height:1.6;display:grid;gap:4px}
+.install button{justify-self:end;border:0;background:none;color:var(--muted);font:inherit;font-size:.8rem;cursor:pointer}
 .remind{background:var(--accent-soft);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:.92rem;display:grid;gap:4px}
 .remind b{color:var(--accent)}
 .ics{border:0;background:none;cursor:pointer;font-size:1rem;padding:0 2px}
@@ -163,6 +166,7 @@ summary{cursor:pointer;font-weight:700}
     <p class="go">填好下面的出生資料，點亮你的第一顆星。</p>
   </div>
 
+  <div class="install" id="install" hidden></div>
   <div class="remind needs-birth" id="remind" hidden></div>
   <nav class="cal needs-birth" id="strip" aria-label="選擇日期"></nav>
   <p class="legend needs-birth"><span><i style="background:var(--sky)"></i>有安排</span><span><i style="background:var(--accent)"></i>有日記</span><span><b style="color:var(--accent)">✦</b> 新月、滿月、水逆這類大日子</span></p>
@@ -1054,6 +1058,20 @@ function start(){
   if(ready){goto(todayKey);renderUpcoming();renderWatch();renderRemind();$("settings").open=false;} else $("settings").open=true;
 }
 start();
+// 還不是從主畫面圖示打開的話，教一下怎麼「加入主畫面」
+(function(){
+  const standalone=navigator.standalone||matchMedia("(display-mode: standalone)").matches;
+  let dismissed=false; try{dismissed=localStorage.getItem("install-hint")==="no"}catch(e){}
+  if(standalone||dismissed) return;
+  const ua=navigator.userAgent, ios=/iPhone|iPad|iPod/.test(ua), inApp=/Line\/|FBAN|FBAV|Instagram|Messenger/i.test(ua);
+  if(!ios&&!/Android/.test(ua)) return;
+  const box=$("install");
+  box.innerHTML=inApp?"<b>📱 想把滿天星變成手機 App？</b><span>先點右上角「⋯」，選「用 Safari 開啟」（Android 選「用瀏覽器開啟」），再照著加入主畫面。</span>"
+    :ios?"<b>📱 把滿天星放到手機桌面</b><span>點下面的分享鈕 <b>⬆</b>，往下滑選「加入主畫面」，以後從桌面的滿天星圖示打開，就像一般 App。</span>"
+    :"<b>📱 把滿天星放到手機桌面</b><span>點右上角「⋮」，選「安裝應用程式」或「加到主畫面」，以後從桌面的圖示打開。</span>";
+  const x=document.createElement("button"); x.type="button"; x.textContent="知道了，不再顯示";
+  x.onclick=()=>{box.hidden=true;try{localStorage.setItem("install-hint","no")}catch(e){}}; box.appendChild(x); box.hidden=false;
+})();
 if("serviceWorker" in navigator && location.protocol==="https:"){navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!reloaded&&navigator.serviceWorker.controller){reloaded=true;location.reload();}});}
 </script>
 </body>
