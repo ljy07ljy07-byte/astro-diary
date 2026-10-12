@@ -114,7 +114,7 @@ summary{cursor:pointer;font-weight:700}
     <div class="mnav needs-birth"><button id="prevM" aria-label="上個月">‹</button><span id="monthLabel"></span><button id="nextM" aria-label="下個月">›</button></div>
   </header>
 
-  <p class="empty" id="welcome" hidden>歡迎使用！在下面填好出生日期和時間，按「儲存並開始使用」就能進入行事曆。如果有 Claude 給你的匯入連結，貼在最下面的框框按「匯入」也可以。</p>
+  <p class="empty" id="welcome" hidden>歡迎使用！在下面填好出生日期、時間和出生地，按「儲存並開始使用」就能進入行事曆。如果有 Claude 給你的匯入連結，貼在最下面的框框按「匯入」也可以。</p>
 
   <nav class="strip needs-birth" id="strip" aria-label="選擇日期"></nav>
 
@@ -167,11 +167,14 @@ summary{cursor:pointer;font-weight:700}
         <label>出生日期<input type="date" id="bDate"></label>
         <label>出生時間<input type="time" id="bTime"></label>
       </div>
-      <div class="grid2">
-        <label>緯度（高雄 22.63）<input type="number" step="0.01" id="bLat" value="22.63"></label>
-        <label>經度（高雄 120.28）<input type="number" step="0.01" id="bLon" value="120.28"></label>
+      <label>出生地<select id="bPlace"></select></label>
+      <div id="manual" hidden>
+        <div class="grid2">
+          <label>緯度（北為正）<input type="number" step="0.01" id="bLat" value="22.63"></label>
+          <label>經度（東為正）<input type="number" step="0.01" id="bLon" value="120.30"></label>
+        </div>
+        <label>時區（台灣是 +8）<input type="number" step="0.5" id="bTz" value="8"></label>
       </div>
-      <label>時區（台灣是 +8）<input type="number" step="0.5" id="bTz" value="8"></label>
       <div class="natal" id="natal"></div>
       <div><button class="btn2" type="submit" id="birthBtn">更新出生資料</button></div>
     </form>
@@ -741,17 +744,28 @@ $("planForm").addEventListener("submit",e=>{
 });
 
 // ---- 設定 ----
+const PLACES=[["基隆市",25.13,121.74],["臺北市",25.03,121.56],["新北市",25.01,121.46],["桃園市",24.99,121.30],["新竹市",24.80,120.97],["新竹縣",24.83,121.01],["苗栗縣",24.56,120.82],["臺中市",24.15,120.67],["彰化縣",24.08,120.54],["南投縣",23.91,120.68],["雲林縣",23.71,120.43],["嘉義市",23.48,120.45],["嘉義縣",23.46,120.25],["臺南市",22.99,120.21],["高雄市",22.63,120.30],["屏東縣",22.67,120.49],["宜蘭縣",24.75,121.75],["花蓮縣",23.99,121.60],["臺東縣",22.76,121.14],["澎湖縣",23.57,119.58],["金門縣",24.43,118.32],["連江縣",26.16,119.95]];
+PLACES.forEach(([n])=>{const o=document.createElement("option");o.textContent=n;$("bPlace").appendChild(o);});
+{const o=document.createElement("option");o.value="other";o.textContent="其他／海外（自己填經緯度）";$("bPlace").appendChild(o);}
+$("bPlace").value="高雄市";
+$("bPlace").onchange=()=>{
+  const p=PLACES.find(x=>x[0]===$("bPlace").value);
+  $("manual").hidden=!!p;
+  if(p){$("bLat").value=p[1];$("bLon").value=p[2];$("bTz").value=8;}
+};
+function placeFor(b){const p=PLACES.find(x=>Math.abs(x[1]-b.lat)<0.1&&Math.abs(x[2]-b.lon)<0.1&&b.tz===8);return p?p[0]:"other";}
 function fillBirth(){
   const b=S.birth; if(!b){$("natal").textContent="";if(!$("bDate").value)$("bDate").value="1990-01-01";if(!$("bTime").value)$("bTime").value="12:00";return;}
   $("bDate").value=`${b.y}-${pad(b.m)}-${pad(b.d)}`; $("bTime").value=`${pad(b.hh)}:${pad(b.mm)}`;
   $("bLat").value=b.lat.toFixed(2); $("bLon").value=b.lon.toFixed(2); $("bTz").value=b.tz;
+  $("bPlace").value=placeFor(b); $("manual").hidden=$("bPlace").value!=="other";
   $("natal").innerHTML=""; NAT.forEach(p=>{const s=document.createElement("span");s.textContent=p.name+" "+Astro.fmt(p.lon);$("natal").appendChild(s);});
 }
 $("birthForm").addEventListener("submit",e=>{
   e.preventDefault();
   if(!$("bDate").value||!$("bTime").value){$("bmsg").textContent="請先選出生日期和時間。";return;}
   if(!$("bLat").value) $("bLat").value="22.63";
-  if(!$("bLon").value) $("bLon").value="120.28";
+  if(!$("bLon").value) $("bLon").value="120.30";
   if(!$("bTz").value) $("bTz").value="8";
   const [y,m,d]=$("bDate").value.split("-").map(Number), [hh,mm]=$("bTime").value.split(":").map(Number);
   S.birth={y,m,d,hh,mm,lat:Number($("bLat").value),lon:Number($("bLon").value),tz:Number($("bTz").value)};
