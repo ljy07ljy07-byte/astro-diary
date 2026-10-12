@@ -98,6 +98,15 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .plist input{width:20px;height:20px;accent-color:var(--sky);margin:0}
 .kind{font-size:.72rem;font-weight:700;border-radius:4px;padding:1px 6px;background:var(--sky-soft);color:var(--sky);white-space:nowrap}
 .kind.new{background:var(--accent-soft);color:var(--accent)}
+.elist{display:grid;gap:10px;margin:8px 0 14px}
+.elist:empty{display:none}
+.ecard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:6px;background:var(--paper)}
+.ecard.editing{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.ecard .et{font-size:.98rem;overflow-wrap:anywhere}
+.ecard .meta{display:flex;flex-wrap:wrap;gap:6px;font-size:.78rem;color:var(--muted)}
+.ecard .meta span{background:var(--bg);border-radius:999px;padding:1px 8px}
+.ecard .acts{display:flex;gap:14px;justify-content:flex-end}
+.ecard .acts button{border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;cursor:pointer;padding:2px 0}
 .auto{margin:0;font-size:.9rem;background:var(--sky-soft);border-radius:10px;padding:8px 12px;line-height:1.6}
 .auto b{color:var(--sky)}
 .auto .fix{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -179,14 +188,15 @@ summary{cursor:pointer;font-weight:700}
     <section class="life">
       <div>
         <div class="label">這天發生了什麼</div>
+        <div class="elist" id="elist"></div>
+        <div class="label" id="formLabel" hidden>再記一件</div>
         <textarea id="text" placeholder="寫一句話就好，例如：被主管稱讚、跟家人吵架"></textarea>
         <p class="hint">可以點鍵盤上的麥克風用說的。</p>
       </div>
       <div class="row"><div class="label">跟什麼有關</div><div class="chips" id="cat"></div></div>
       <div class="row"><div class="label">影響有多大（1 小事～5 大事）</div><div class="chips" id="int"></div></div>
       <div class="row"><div class="label">心情</div><div class="chips" id="feel"></div></div>
-      <div class="save"><button class="btn" id="saveBtn" type="button">儲存這一天</button><span class="msg" id="msg"></span></div>
-      <p class="auto" id="auto" hidden></p>
+      <div class="save"><button class="btn" id="saveBtn" type="button">記下這件事</button><button class="btn2" id="cancelBtn" type="button" hidden>取消</button><span class="msg" id="msg"></span></div>
     </section>
   </article>
 
@@ -656,8 +666,14 @@ if(!S) S={birth:null,entries:{},plans:{},notes:{}};
 S.notes=S.notes||{}; S.periods=S.periods||[];
 function migrate(){
   const C={"補習班／工作":"工作／學業","人際衝突":"人際","官方／文件":"生活瑣事","家庭":"家人","情緒":"心情"}, M={"高":"很準","中":"有點準","低":"不太準","無關":"沒關係"};
-  for(const k in S.entries){const e=S.entries[k]; if(C[e.category]) e.category=C[e.category]; if(M[e.match]) e.match=M[e.match];}
+  // 一天可以記好幾件事：舊版一天一筆的資料轉成清單
+  for(const k in S.entries){
+    let arr=S.entries[k]; if(!Array.isArray(arr)) arr=(arr&&(arr.text||arr.category||arr.feeling))?[arr]:[];
+    arr.forEach((e,i)=>{if(!e.id) e.id=k.replace(/-/g,"")+"-"+i; if(C[e.category]) e.category=C[e.category]; if(M[e.match]) e.match=M[e.match];});
+    if(arr.length) S.entries[k]=arr; else delete S.entries[k];
+  }
 }
+const dayEntries=k=>S.entries[k]||[];
 migrate();
 // 一次性匯入連結：#data=<base64url JSON>（資料只在網址的 # 後面，不會傳到伺服器）
 function importCode(code){
@@ -706,7 +722,7 @@ function renderStrip(){
   for(let d=1;d<=daysIn(vy,vm);d++){
     const k=K(vy,vm,d);
     const b=document.createElement("button");
-    b.className="day"+(k===sel?" sel":"")+(k===todayKey?" today":"")+(S.entries[k]?.text?" has":"")+(S.plans[k]?.length?" hasplan":"");
+    b.className="day"+(k===sel?" sel":"")+(k===todayKey?" today":"")+(dayEntries(k).some(e=>e.text)?" has":"")+(S.plans[k]?.length?" hasplan":"");
     b.innerHTML=`<b>${d}</b><span class="dots"><u></u><i></i></span>`+(bigDay(k)?'<span class="sky">✦</span>':"");
     b.setAttribute("aria-label",`${vm} 月 ${d} 日 星期${wd(k)}`);
     b.onclick=()=>select(k);
@@ -767,24 +783,51 @@ function autoMatch(k,e){
   const area=hit.cats.find(c=>cats.has(c));
   return {level:same?"對得上":"有提到",area,text:hit.text};
 }
-function renderAuto(){
-  const r=autoMatch(sel,S.entries[sel]), box=$("auto");
-  box.hidden=!r; if(!r) return;
-  box.innerHTML="";
+function matchBox(k,e){
+  const r=autoMatch(k,e), box=document.createElement("p"); box.className="auto";
+  if(!r) return null;
   const b=document.createElement("b");
   if(r.mine){b.textContent="跟星象對照："+(r.level==="對得上"?"✓✓ 對得上":"沒提到");box.append(b,"　（你自己判斷的）");}
-  else if(r.level==="看不出來"){b.textContent="跟星象對照：";box.append(b,"還看不出來是哪方面的事，點一下上面「跟什麼有關」就能比對。");}
+  else if(r.level==="看不出來"){b.textContent="跟星象對照：";box.append(b,"還看不出來是哪方面的事，按「修改」點一下「跟什麼有關」就能比對。");}
   else if(r.level==="沒提到"){b.textContent="跟星象對照：沒提到";box.append(b,"　這天的星象沒講到這方面的事，也很正常，留著當紀錄就好。");}
   else{b.textContent=r.level==="對得上"?"跟星象對照：✓✓ 對得上":"跟星象對照：✓ 有提到";
     box.append(b,`　這天的星象有提到「${r.area}」方面：${r.text}`+(r.level==="對得上"?"，連好壞都對得上。":"。"));}
   // 自動判斷不準時，自己按一下改掉
   const fix=document.createElement("span"); fix.className="fix";
   const mk=(t,v)=>{const x=document.createElement("button");x.type="button";x.className="chip";x.textContent=t;
-    x.onclick=()=>{const e=S.entries[sel]; if(!e) return; if(v) e.matchMine=v; else delete e.matchMine; persist(); renderAuto(); renderLog();}; fix.appendChild(x);};
+    x.onclick=()=>{if(v) e.matchMine=v; else delete e.matchMine; persist(); renderEntries(); renderLog();}; fix.appendChild(x);};
   if(r.mine) mk("改回自動判斷",null);
   else{ if(r.level!=="對得上") mk("我覺得對得上","對得上"); if(r.level!=="沒提到") mk("我覺得沒關係","沒提到"); }
   box.appendChild(fix);
+  return box;
 }
+const FEELNAME={"＋":"開心","－":"不開心","＝":"普通"};
+// 這天記下的每一件事，各自一張小卡
+let editing=null;
+function renderEntries(){
+  const list=$("elist"); list.innerHTML="";
+  const arr=dayEntries(sel);
+  arr.forEach(e=>{
+    const c=document.createElement("div"); c.className="ecard"+(editing===e.id?" editing":"");
+    const t=document.createElement("div"); t.className="et"; t.textContent=e.text||"（沒寫內容）";
+    const meta=document.createElement("div"); meta.className="meta";
+    [e.category,FEELNAME[e.feeling]||e.feeling,e.intensity?"影響 "+e.intensity:null].filter(Boolean).forEach(x=>{const s=document.createElement("span");s.textContent=x;meta.appendChild(s);});
+    const acts=document.createElement("div"); acts.className="acts";
+    const ed=document.createElement("button"); ed.type="button"; ed.textContent="修改"; ed.onclick=()=>startEdit(e);
+    const del=document.createElement("button"); del.type="button"; del.textContent="刪除";
+    del.onclick=()=>{if(!confirm("確定刪除這一件嗎？")) return; S.entries[sel]=arr.filter(x=>x!==e); if(!S.entries[sel].length) delete S.entries[sel]; if(editing===e.id) resetForm(); persist(); afterSave();};
+    acts.append(ed,del);
+    c.append(t); if(meta.children.length) c.append(meta);
+    const m=matchBox(sel,e); if(m) c.append(m);
+    c.append(acts); list.appendChild(c);
+  });
+  $("formLabel").hidden=!arr.length||!!editing;
+  $("saveBtn").textContent=editing?"更新這件事":"記下這件事";
+  $("cancelBtn").hidden=!editing;
+}
+function resetForm(){editing=null; form={category:null,intensity:null,feeling:null,match:null}; $("text").value=""; renderForm();}
+function startEdit(e){editing=e.id; form={category:e.category||null,intensity:e.intensity||null,feeling:e.feeling||null,match:e.match||null}; $("text").value=e.text||""; renderForm(); renderEntries(); $("text").focus();}
+function afterSave(){renderEntries();renderStrip();renderLog();renderWatch();}
 function renderForm(){
   chipGroup($("cat"),CATS,"category"); chipGroup($("int"),["1","2","3","4","5"],"intensity");
   chipGroup($("feel"),FEELS,"feeling");
@@ -811,10 +854,11 @@ function recallsFor(k){
   const now=dayAstro(k).keys, out=[];
   // 只看 20 天以前的事，避免同一段星象的前後幾天互相提醒
   const cut=new Date(Date.UTC(+k.slice(0,4),+k.slice(5,7)-1,+k.slice(8))-20*86400e3).toISOString().slice(0,10);
-  Object.keys(S.entries).filter(d=>d<cut&&S.entries[d].text&&Number(S.entries[d].intensity)>=3).sort().reverse().forEach(d=>{
+  Object.keys(S.entries).filter(d=>d<cut).sort().reverse().forEach(d=>{
+    const big=dayEntries(d).filter(e=>e.text&&Number(e.intensity)>=3); if(!big.length) return;
     const past=dayAstro(d).keys;
     const same=Object.keys(now).filter(x=>x in past);
-    if(same.length) out.push({d,e:S.entries[d],why:now[same[0]]});
+    if(same.length) big.forEach(e=>out.push({d,e,why:now[same[0]]}));
   });
   // 影響越大的排越前面，同分的話越近的越前面
   return out.sort((a,b)=>Number(b.e.intensity)-Number(a.e.intensity)||(a.d<b.d?1:-1));
@@ -898,26 +942,24 @@ function renderUpcoming(){
 }
 function renderLog(){
   const pre=K(vy,vm,1).slice(0,8);
-  const list=Object.entries(S.entries).filter(([k,v])=>k.startsWith(pre)&&v.text).sort();
+  const list=Object.keys(S.entries).filter(k=>k.startsWith(pre)).sort().flatMap(k=>dayEntries(k).filter(v=>v.text).map(v=>[k,v]));
   const log=$("log"); log.innerHTML="";
   if(!list.length){log.innerHTML='<p class="empty">這個月還沒寫日記。點上面的日期，寫下那天發生的事，就會出現在這裡。</p>';$("stats").textContent="";return;}
   list.forEach(([k,v])=>{
     const b=document.createElement("button");
     const a=document.createElement("span");a.className="d";a.textContent=md(k);
-    const t=document.createElement("span");t.className="t";t.textContent=v.text+(v.feeling?"　"+v.feeling:"");
+    const t=document.createElement("span");t.className="t";t.textContent=v.text+(FEELNAME[v.feeling]?"　"+FEELNAME[v.feeling]:"");
     const m=document.createElement("span");m.className="m";m.textContent=autoMatch(k,v)?.level||"";
     b.append(a,t,m); b.onclick=()=>{select(k);scrollTo({top:0,behavior:"smooth"});};
     log.appendChild(b);
   });
   const c=x=>list.filter(([k,v])=>autoMatch(k,v)?.level===x).length;
-  $("stats").innerHTML=`<span>記了 <b>${list.length}</b> 天</span><span>對得上 <b>${c("對得上")}</b></span><span>有提到 <b>${c("有提到")}</b></span><span>沒提到 <b>${c("沒提到")}</b></span>`;
+  $("stats").innerHTML=`<span>記了 <b>${new Set(list.map(x=>x[0])).size}</b> 天、<b>${list.length}</b> 件事</span><span>對得上 <b>${c("對得上")}</b></span><span>有提到 <b>${c("有提到")}</b></span><span>沒提到 <b>${c("沒提到")}</b></span>`;
 }
 function select(k){
-  sel=k; const e=S.entries[k]||{};
-  form={category:e.category||null,intensity:e.intensity||null,feeling:e.feeling||null,match:e.match||null};
-  $("text").value=e.text||"";
-  renderStrip(); renderChart(); renderRecall(); renderPlans(); renderForm(); renderAuto();
-  setMsg(e.updatedAt?"上次儲存："+new Date(e.updatedAt).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"");
+  sel=k; resetForm();
+  renderStrip(); renderChart(); renderRecall(); renderPlans(); renderEntries();
+  setMsg("");
 }
 function goto(k){vy=Number(k.slice(0,4));vm=Number(k.slice(5,7));select(k);renderLog();}
 function shiftMonth(n){vm+=n;if(vm<1){vm=12;vy--;}if(vm>12){vm=1;vy++;}goto(K(vy,vm,1)===todayKey.slice(0,8)+"01"?todayKey:K(vy,vm,1));}
@@ -927,13 +969,16 @@ $("todayBtn").onclick=()=>goto(todayKey);
 $("gearBtn").onclick=()=>{const st=$("settings");st.hidden=!st.hidden;if(!st.hidden){st.open=true;st.scrollIntoView({behavior:"smooth"});}};
 
 $("saveBtn").onclick=()=>{
-  const old=S.entries[sel]||{};
-  S.entries[sel]={text:$("text").value.trim(),category:form.category,intensity:form.intensity,feeling:form.feeling,match:form.match,updatedAt:new Date().toISOString()};
-  if(old.matchMine) S.entries[sel].matchMine=old.matchMine;
-  if(!S.entries[sel].text&&!form.category&&!form.feeling) delete S.entries[sel];
-  if(persist()){setMsg("已儲存 "+md(sel));renderStrip();renderLog();renderWatch();renderAuto();}
+  const v={text:$("text").value.trim(),category:form.category,intensity:form.intensity,feeling:form.feeling,updatedAt:new Date().toISOString()};
+  if(!v.text&&!v.category&&!v.feeling){setMsg("先寫一句話，或點一下類別、心情。",true);return;}
+  const arr=S.entries[sel]=dayEntries(sel);
+  const old=editing&&arr.find(x=>x.id===editing);
+  if(old) Object.assign(old,v); else arr.push({id:Date.now().toString(36),...v});
+  const was=!!old; resetForm();
+  if(persist()){setMsg((was?"已更新 ":"已記下 ")+md(sel)+"，下面可以再記一件");afterSave();}
   else setMsg("存不進去，手機空間可能滿了。",true);
 };
+$("cancelBtn").onclick=()=>{resetForm();renderEntries();setMsg("");};
 $("planForm").addEventListener("submit",e=>{
   e.preventDefault();
   const text=$("planText").value.trim(); if(!text) return;
@@ -992,7 +1037,7 @@ $("importFile").onchange=async e=>{
   try{
     const d=JSON.parse(await f.text());
     if(!d.entries||!d.plans||!d.birth) throw 0;
-    S=d; S.notes=S.notes||{}; S.periods=S.periods||[]; persist(); NAT=Astro.natal(S.birth); for(const k in cache) delete cache[k];
+    S=d; S.notes=S.notes||{}; S.periods=S.periods||[]; migrate(); persist(); NAT=Astro.natal(S.birth); for(const k in cache) delete cache[k];
     start(); $("bmsg").textContent="已匯入備份。";
   }catch(err){$("bmsg").textContent="這個檔案不是滿天星行事曆的備份。";}
   e.target.value="";
