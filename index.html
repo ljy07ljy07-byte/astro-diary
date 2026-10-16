@@ -112,6 +112,9 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .ecard .meta span{background:var(--bg);border-radius:999px;padding:1px 8px}
 .ecard .acts{display:flex;gap:14px;justify-content:flex-end}
 .ecard .acts button{border:0;background:none;color:var(--muted);font:inherit;font-size:.82rem;cursor:pointer;padding:2px 0}
+.hbox{margin:0;font-size:.85rem;line-height:1.6;color:var(--muted)}
+.hbox b{color:var(--ink);font-weight:600}
+.hbox .hit.on{color:var(--accent);font-weight:600}
 .auto{margin:0;font-size:.9rem;background:var(--sky-soft);border-radius:10px;padding:8px 12px;line-height:1.6}
 .auto b{color:var(--sky)}
 .auto .fix{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -543,7 +546,29 @@ function angles(date,latDeg,lonDeg){
   const e=obliquity(date)*rad, phi=latDeg*rad;
   const mc=norm(Math.atan2(Math.sin(ramc),Math.cos(ramc)*Math.cos(e))/rad);
   const asc=norm(Math.atan2(Math.cos(ramc),-(Math.sin(ramc)*Math.cos(e)+Math.tan(phi)*Math.sin(e)))/rad);
-  return {asc,mc};
+  return {asc,mc,ramc,e,phi};
+}
+// Placidus 宮首：回傳 12 個宮首的黃經（cusps[0]=1 宮）
+function houses(date,latDeg,lonDeg){
+  const {asc,mc,ramc,e,phi}=angles(date,latDeg,lonDeg);
+  const cusp=(f,below)=>{ // f：半弧的幾分之幾；below=true 表示地平線下的 2、3 宮（用對宮 8、9 的半弧推回來）
+    let lam=norm(ramc/rad+(below?180-f*90:f*90));
+    for(let i=0;i<30;i++){
+      const dec=Math.asin(Math.sin(e)*Math.sin(lam*rad));
+      const x=Math.tan(phi)*Math.tan(dec); const ad=Math.abs(x)<1?Math.asin(x)/rad:0;
+      const ra=below?ramc/rad+180-f*(90+ad):ramc/rad+f*(90+ad);
+      lam=norm(Math.atan2(Math.sin(ra*rad),Math.cos(ra*rad)*Math.cos(e))/rad);
+    }
+    return lam;
+  };
+  const c11=cusp(1/3,false), c12=cusp(2/3,false), c2=cusp(2/3,true), c3=cusp(1/3,true);
+  const c=[asc,c2,c3,norm(mc+180),norm(c11+180),norm(c12+180),norm(asc+180),norm(c2+180),norm(c3+180),mc,c11,c12];
+  return c;
+}
+// 黃經 l 落在第幾宮（1～12）
+function houseOf(l,cusps){
+  for(let i=0;i<12;i++){const a=cusps[i], b=cusps[(i+1)%12]; if(norm(l-a)<norm(b-a)) return i+1;}
+  return 1;
 }
 // birth: {y,m,d,hh,mm,tz,lat,lon}
 function natal(b){
@@ -551,6 +576,8 @@ function natal(b){
   const pts=BODIES.map(([k,n])=>({key:k,name:n,lon:lon(k,date)}));
   const {asc,mc}=angles(date,b.lat,b.lon);
   pts.push({key:"ASC",name:"上升",lon:asc},{key:"MC",name:"天頂",lon:mc});
+  pts.cusps=houses(date,b.lat,b.lon);
+  pts.forEach(p=>p.house=houseOf(p.lon,pts.cusps));
   return pts;
 }
 const signOf=l=>SIGNS[Math.floor(norm(l)/30)];
@@ -592,7 +619,7 @@ function majorDay(y,m,d,tz,nat){
     for(const p of nat){
       for(const [ang,name] of ASPECTS){
         const orb=Math.abs(Math.abs(sdiff(l,p.lon))-ang);
-        if(orb<=ORB[k]) out.push({type:SLOW.has(k)?"bg":"aspect",body:n,bkey:k,aspect:name,ang,point:p,orb,retro});
+        if(orb<=ORB[k]) out.push({type:SLOW.has(k)?"bg":"aspect",body:n,bkey:k,aspect:name,ang,point:p,orb,retro,tl:l});
       }
     }
   }
@@ -654,12 +681,18 @@ function day(y,m,d,tz,nat){
   if(major.some(x=>x.type==="lunation"&&x.text.startsWith("滿月"))) add("事情告一段落，情緒比較滿",["心情"],"mix");
   [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,2).forEach(h=>add(phrase(h.aspect,h.point.key),AREA[h.point.key],tone(h.aspect)));
   if(bg.length) lines.push({tag:"景",text:bg.join("、")});
+  // 今天被點到的宮位：被碰到的本命點在哪一宮、行運行星走在哪一宮
+  const hh=[], addH=(h,via)=>{if(!h) return; const o=hh.find(x=>x.h===h); if(o){if(!o.via.includes(via)) o.via.push(via);} else hh.push({h,via:[via]});};
+  if(nat.cusps){
+    major.filter(x=>x.type==="aspect").forEach(x=>{addH(x.point.house,"你的"+(PT[x.point.key]||x.point.name)); addH(houseOf(x.tl,nat.cusps),x.body+"走到這裡");});
+    [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,3).forEach(h=>addH(h.point.house,"你的"+(PT[h.point.key]||h.point.name)));
+  }
   const seen=new Set(), uniq=[];
   t.forEach(x=>{if(!seen.has(x)){seen.add(x);uniq.push(x);}});
   const shown=new Set(uniq.slice(0,3));
-  return {lines, keys, themes:themes.filter(x=>shown.has(x.text)), tendency: uniq.length?uniq.slice(0,3).join("；"):"平平順順的一天"};
+  return {lines, keys, houses:hh, themes:themes.filter(x=>shown.has(x.text)), tendency: uniq.length?uniq.slice(0,3).join("；"):"平平順順的一天"};
 }
-root.Astro={natal,day,fmt,signOf,SIGNS};
+root.Astro={natal,day,fmt,signOf,SIGNS,houses,houseOf};
 })(typeof window!=="undefined"?window:globalThis);
 </script>
 <script>
@@ -667,7 +700,20 @@ const CATS=["工作／學業","感情","人際","家人","金錢","健康","心�
 const FEELS=[["＋","開心"],["－","不開心"],["＝","普通"]];
 const MATCH=["很準","有點準","不太準","沒關係"];
 const WD="日一二三四五六";
-const TAGNAME={大:"大方向",月:"月亮",牌:"塔羅",景:"背景",提醒:"提醒"};
+const TAGNAME={大:"大方向",月:"月亮",牌:"塔羅",景:"背景",提醒:"提醒",宮:"宮位"};
+// 十二宮白話
+const HN=["","自己、身體","金錢、收入","溝通、學習、兄弟姊妹","家、父母","小孩、戀愛、創作","工作日常、健康","伴侶、合作對象","共同資源、深層情緒","遠方、教學、信念","事業、名聲","朋友、團體","內心、休息"];
+// 日記內容可能落在哪幾宮：先看類別，再看文字裡的關鍵字
+const CATH={"工作／學業":[6,10],"感情":[5,7],"人際":[11,7],"家人":[4],"金錢":[2,8],"健康":[6,1],"心情":[12,4],"生活瑣事":[6,3]};
+const KWH=[[1,/我自己|外表|形象|打扮/],[2,/錢|收入|薪|花了|存款|帳單/],[3,/溝通|訊息|聊天|兄弟|姊妹|姐妹|鄰居|學習|開車|文件/],
+ [4,/家裡|回家|媽|爸|父母|房子|搬家|公婆/],[5,/小孩|孩子|兒子|女兒|學生|戀愛|約會|曖昧|創作|娛樂/],[6,/工作|上班|同事|加班|生病|看診|醫|寵物|瑣事/],
+ [7,/老公|老婆|伴侶|另一半|對方|合作|客戶|家長|吵架|談判|簽約/],[8,/股票|投資|貸款|保險|情緒|壓力|承擔|扛|推給我|推到我|丟給我|丟到我/],
+ [9,/出國|旅行|遠行|教課|教學|考試|信仰|進修|課程|出版/],[10,/事業|主管|老闆|名聲|升遷|業績|上架|成就/],[11,/朋友|團體|社群|粉絲|網友|同學|聚餐|社團|app/i],[12,/失眠|休息|獨處|冥想|夢|醫院/]];
+function entryHouses(e){
+  const hs=[...(CATH[e.category]||[])];
+  KWH.forEach(([h,re])=>{if(re.test(e.text||"")&&!hs.includes(h)) hs.push(h);});
+  return hs;
+}
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,"0");
 const K=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
@@ -751,6 +797,7 @@ function renderChart(){
   const sp=document.createElement("span"); sp.textContent=`星期${wd(sel)}${sel===todayKey?"・今天":""}`; $("date").appendChild(sp);
   const ul=$("astro"); ul.innerHTML="";
   const lines=[...a.lines];
+  if(a.houses&&a.houses.length) lines.push({tag:"宮",text:"今天點到："+a.houses.map(x=>`${x.h}宮（${HN[x.h]}）`).join("、")});
   const n=S.notes[sel];
   if(n&&n.card) lines.push({tag:"牌",text:n.card});
   S.periods.filter(p=>p.s<=sel&&sel<=(p.e||p.s)).forEach(p=>lines.push({tag:"提醒",text:p.t+(p.e&&p.e!==p.s?`（${md(p.s)}～${md(p.e)}）`:"")}));
@@ -790,12 +837,27 @@ function autoMatch(k,e){
   const th=dayAstro(k).themes||[];
   const ft=tone(e)||null;
   const hits=th.filter(t=>t.cats.some(c=>cats.has(c)));
-  if(!hits.length) return {level:"沒提到"};
+  if(!hits.length){
+    // 說法沒講到，但宮位有被點到，也算有提到
+    const day=dayAstro(k).houses||[], hh=entryHouses(e).filter(h=>day.some(x=>x.h===h));
+    return hh.length?{level:"有提到",house:hh}:{level:"沒提到"};
+  }
   // 先找好壞也一致的那一條
   const hit=hits.find(t=>ft&&t.tone===ft)||hits.find(t=>ft&&t.tone==="mix")||hits[0];
   const same=!!ft&&(hit.tone===ft||hit.tone==="mix");
   const area=hit.cats.find(c=>cats.has(c));
   return {level:same?"對得上":"有提到",area,text:hit.text};
+}
+function houseBox(k,e){
+  const hs=entryHouses(e); if(!hs.length) return null;
+  const day=dayAstro(k).houses||[];
+  const box=document.createElement("p"); box.className="hbox";
+  const b=document.createElement("b"); b.textContent="這件事的宮位："; box.append(b,hs.map(h=>`${h}宮（${HN[h]}）`).join("、"));
+  const hit=hs.map(h=>day.find(x=>x.h===h)).filter(Boolean);
+  const r=document.createElement("span"); r.className="hit";
+  r.textContent=hit.length?"★ 這天的星象正好點到 "+hit.map(x=>`${x.h}宮（${x.via.join("、")}）`).join("；"):`這天點到的是 ${day.slice(0,4).map(x=>x.h).join("、")} 宮，沒有直接碰到這件事的宮位。`;
+  if(hit.length) r.classList.add("on");
+  box.append(document.createElement("br"),r); return box;
 }
 function matchBox(k,e){
   const r=autoMatch(k,e), box=document.createElement("p"); box.className="auto";
@@ -804,6 +866,7 @@ function matchBox(k,e){
   if(r.mine){b.textContent="跟星象對照："+(r.level==="對得上"?"✓✓ 對得上":"沒提到");box.append(b,"　（你自己判斷的）");}
   else if(r.level==="看不出來"){b.textContent="跟星象對照：";box.append(b,"還看不出來是哪方面的事，按「修改」點一下「跟什麼有關」就能比對。");}
   else if(r.level==="沒提到"){b.textContent="跟星象對照：沒提到";box.append(b,"　這天的星象沒講到這方面的事，也很正常，留著當紀錄就好。");}
+  else if(r.house){b.textContent="跟星象對照：✓ 有提到";box.append(b,`　「今天可能」沒寫到，但這天的星象點到這件事的 ${r.house.join("、")} 宮。`);}
   else{b.textContent=r.level==="對得上"?"跟星象對照：✓✓ 對得上":"跟星象對照：✓ 有提到";
     box.append(b,`　這天的星象有提到「${r.area}」方面：${r.text}`+(r.level==="對得上"?"，連好壞都對得上。":"。"));}
   // 自動判斷不準時，自己按一下改掉
@@ -832,6 +895,7 @@ function renderEntries(){
     del.onclick=()=>{if(!confirm("確定刪除這一件嗎？")) return; S.entries[sel]=arr.filter(x=>x!==e); if(!S.entries[sel].length) delete S.entries[sel]; if(editing===e.id) resetForm(); persist(); afterSave();};
     acts.append(ed,del);
     c.append(t); if(meta.children.length) c.append(meta);
+    const hb=houseBox(sel,e); if(hb) c.append(hb);
     const m=matchBox(sel,e); if(m) c.append(m);
     c.append(acts); list.appendChild(c);
   });
