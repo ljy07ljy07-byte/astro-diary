@@ -122,7 +122,7 @@ button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-vis
 .chain .ar{color:var(--muted)}
 .lks{margin:0;padding-left:1.1em;display:grid;gap:2px}
 .lks li.both{color:var(--accent);font-weight:600}
-.astro li.links .lk{display:grid;gap:2px;font-size:.85rem;color:var(--muted)}
+.astro li.links .lk{display:grid;gap:6px;font-size:.85rem;color:var(--muted)}
 .auto{margin:0;font-size:.9rem;background:var(--sky-soft);border-radius:10px;padding:8px 12px;line-height:1.6}
 .auto b{color:var(--sky)}
 .auto .fix{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -717,13 +717,13 @@ const MATCH=["很準","有點準","不太準","沒關係"];
 const WD="日一二三四五六";
 const TAGNAME={大:"大方向",月:"月亮",牌:"塔羅",景:"背景",提醒:"提醒",宮:"宮位"};
 // 十二宮白話
-const HN=["","自己、身體","金錢、收入","溝通、學習、兄弟姊妹","家、父母","小孩、戀愛、創作","工作日常、健康","伴侶、合作對象","共同資源、深層情緒","遠方、教學、信念","事業、名聲","朋友、團體","內心、休息"];
+const HN=["","自己、身體","金錢、收入","溝通、文件、學習、兄弟姊妹","家、父母、根據地","小孩、戀愛、創作","工作日常、健康、例行事務","伴侶、合作對象、一對一的對方","共同資源、深層情緒、別人的東西","教育、遠方、信念","事業、名聲、公家機關","朋友、團體、學生群","內心、休息、看不見的事"];
 // 日記內容可能落在哪幾宮：先看類別，再看文字裡的關鍵字
 const CATH={"工作／學業":[6,10],"感情":[5,7],"人際":[11,7],"家人":[4],"金錢":[2,8],"健康":[6,1],"心情":[12,4],"生活瑣事":[6,3]};
 const KWH=[[1,/我自己|我身上|針對我|衝著我|外表|形象|打扮/],[2,/錢|收入|薪|花了|存款|帳單/],[3,/溝通|訊息|聊天|兄弟|姊妹|姐妹|鄰居|學習|開車|文件/],
- [4,/家裡|回家|媽|爸|父母|房子|搬家|公婆/],[5,/小孩|孩子|兒子|女兒|學生|戀愛|約會|曖昧|創作|娛樂/],[6,/工作|上班|同事|加班|生病|看診|醫|寵物|瑣事/],
+ [4,/家裡|回家|媽|爸|父母|房子|搬家|公婆|會勘|場地|教室|店面/],[5,/小孩|孩子|兒子|女兒|學生|戀愛|約會|曖昧|創作|娛樂/],[6,/工作|上班|同事|加班|生病|看診|醫|寵物|瑣事/],
  [7,/老公|老婆|伴侶|另一半|對方|合作|客戶|家長|吵架|談判|簽約/],[8,/股票|投資|貸款|保險|情緒|壓力|承擔|扛|推給我|推到我|丟給我|丟到我/],
- [9,/出國|旅行|遠行|教課|教學|考試|信仰|進修|課程|出版/],[10,/事業|主管|老闆|名聲|升遷|業績|上架|成就/],[11,/朋友|團體|社群|粉絲|網友|同學|聚餐|社團|app/i],[12,/失眠|休息|獨處|冥想|夢|醫院/]];
+ [9,/出國|旅行|遠行|教課|教學|教育(?!局)|補習|考試|信仰|進修|課程|出版/],[10,/事業|主管|老闆|名聲|升遷|業績|上架|成就|教育局|政府|公家|官方|稽查|評鑑|檢查|立案/],[11,/朋友|團體|社群|粉絲|網友|同學|聚餐|社團|app/i],[12,/失眠|休息|獨處|冥想|夢|醫院/]];
 // 依文字出現的順序排出「關係鏈」：例如 家長(7宮) → 小孩(5宮) → 推到我身上(8宮)
 function entryChain(e){
   const t=e.text||"", found=[];
@@ -825,7 +825,7 @@ function renderChart(){
     const li=document.createElement("li"); li.className="links";
     const tag=document.createElement("span"); tag.className="tag"; tag.textContent="宮位";
     const box=document.createElement("span"); box.className="lk";
-    a.links.forEach(x=>{const r=document.createElement("span"); r.textContent=`${x.body}（走在你的${x.fromH}宮）和你的${x.to}（${x.toH}宮）${x.verb}`; box.appendChild(r);});
+    a.links.forEach(x=>{const r=document.createElement("span"); r.textContent=`${x.body}走在你的${x.fromH}宮（${x.fromH}宮代表${HN[x.fromH]}），和你${x.toH}宮的${x.to}${x.verb}`+(x.toH!==x.fromH?`（${x.toH}宮代表${HN[x.toH]}）`:"")+"。"; box.appendChild(r);});
     li.append(tag,box); lines.__links=li;
   }
   lines.filter(l=>l.tag!=="景").forEach(l=>{
