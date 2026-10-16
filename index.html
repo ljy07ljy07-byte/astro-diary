@@ -592,9 +592,11 @@ const signOf=l=>SIGNS[Math.floor(norm(l)/30)];
 const fmt=l=>{const s=norm(l)%30;return signOf(l)+" "+Math.floor(s)+"°"+String(Math.round((s%1)*60)).padStart(2,"0")+"′";};
 
 // 白話相位
-const VERB={"合":"疊在一起","六分":"互相幫一把","三分":"很合拍","四分":"互相卡住","對分":"正面對上"};
+// 相位名稱用傳統說法：合 0°、六合 60°、刑 90°、拱 120°、沖 180°
+const VERB={"合":"合","六分":"六合","三分":"拱","四分":"刑","對分":"沖"};
+const DEG={"合":0,"六分":60,"三分":120,"四分":90,"對分":180};
 const PT={ASC:"上升點",MC:"天頂（事業點）"};
-const rel=(aspect,p)=>`和你的${PT[p.key]||p.name}${VERB[aspect]}`;
+const rel=(aspect,p)=>`${VERB[aspect]}你的${PT[p.key]||p.name}（${DEG[aspect]}°）`;
 // 一天的範圍（以時區 tz 的當地 0:00～24:00）
 function dayRange(y,m,d,tz){const s=new Date(Date.UTC(y,m-1,d)-tz*3600e3);return [s,new Date(s.getTime()+86400e3)];}
 
@@ -694,9 +696,9 @@ function day(y,m,d,tz,nat){
   // 相位連線：行運行星（在你的第幾宮）—角度—你的本命點（在第幾宮）
   const links=[];
   if(nat.cusps){
-    major.filter(x=>x.type==="aspect").forEach(x=>links.push({body:x.body,fromH:houseOf(x.tl,nat.cusps),verb:VERB[x.aspect],aspect:x.aspect,to:PT[x.point.key]||x.point.name,toH:x.point.house,big:true}));
+    major.filter(x=>x.type==="aspect").forEach(x=>links.push({body:x.body,fromH:houseOf(x.tl,nat.cusps),verb:VERB[x.aspect],deg:DEG[x.aspect],aspect:x.aspect,to:PT[x.point.key]||x.point.name,toH:x.point.house,big:true}));
     const [s0,e0]=dayRange(y,m,d,tz), ml=lon("Moon",new Date((s0.getTime()+e0.getTime())/2));
-    [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,3).forEach(h=>links.push({body:"月亮",fromH:houseOf(ml,nat.cusps),verb:VERB[h.aspect],aspect:h.aspect,to:PT[h.point.key]||h.point.name,toH:h.point.house,big:false}));
+    [...moon.hits].sort((a,b)=>RANK[a.aspect]-RANK[b.aspect]).slice(0,3).forEach(h=>links.push({body:"月亮",fromH:houseOf(ml,nat.cusps),verb:VERB[h.aspect],deg:DEG[h.aspect],aspect:h.aspect,to:PT[h.point.key]||h.point.name,toH:h.point.house,big:false}));
   }
   if(nat.cusps){
     major.filter(x=>x.type==="aspect").forEach(x=>{addH(x.point.house,"你的"+(PT[x.point.key]||x.point.name)); addH(houseOf(x.tl,nat.cusps),x.body+"走到這裡");});
@@ -825,7 +827,7 @@ function renderChart(){
     const li=document.createElement("li"); li.className="links";
     const tag=document.createElement("span"); tag.className="tag"; tag.textContent="宮位";
     const box=document.createElement("span"); box.className="lk";
-    a.links.forEach(x=>{const r=document.createElement("span"); r.textContent=`${x.body}走在你的${x.fromH}宮（${x.fromH}宮代表${HN[x.fromH]}），和你${x.toH}宮的${x.to}${x.verb}`+(x.toH!==x.fromH?`（${x.toH}宮代表${HN[x.toH]}）`:"")+"。"; box.appendChild(r);});
+    a.links.forEach(x=>{const r=document.createElement("span"); r.textContent=`${x.body}走在你的${x.fromH}宮（${x.fromH}宮代表${HN[x.fromH]}），${x.verb}你${x.toH}宮的${x.to}（${x.deg}°）`+(x.toH!==x.fromH?`，${x.toH}宮代表${HN[x.toH]}`:"")+"。"; box.appendChild(r);});
     li.append(tag,box); lines.__links=li;
   }
   lines.filter(l=>l.tag!=="景").forEach(l=>{
@@ -892,7 +894,7 @@ function houseBox(k,e){
   const ul=document.createElement("ul"); ul.className="lks";
   rel.forEach(l=>{const both=hs.includes(l.fromH)&&hs.includes(l.toH)&&l.fromH!==l.toH;
     const li=document.createElement("li"); if(both) li.className="both";
-    li.textContent=`${l.body}（${l.fromH}宮）和你的${l.to}（${l.toH}宮）${l.verb}`+(both?`：把 ${l.fromH}宮 和 ${l.toH}宮 連在一起`:l.fromH===l.toH?`：都在 ${l.toH}宮`:hs.includes(l.toH)?`：點到 ${l.toH}宮`:`：從 ${l.fromH}宮 出發`);
+    li.textContent=`${l.body}（${l.fromH}宮）${l.verb}你的${l.to}（${l.toH}宮，${l.deg}°）`+(both?`：把 ${l.fromH}宮 和 ${l.toH}宮 連在一起`:l.fromH===l.toH?`：都在 ${l.toH}宮`:hs.includes(l.toH)?`：點到 ${l.toH}宮`:`：從 ${l.fromH}宮 出發`);
     ul.appendChild(li);});
   if(rel.length) box.append(ul);
   else{const p=document.createElement("small");p.textContent="這天的相位沒有碰到這些宮位。";box.append(p);}
